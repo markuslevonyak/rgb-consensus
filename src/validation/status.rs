@@ -243,8 +243,6 @@ pub enum Failure {
     CyclicGraph(OpId),
     /// operation {0} is absent from the consignment.
     OperationAbsent(OpId),
-    /// transition bundle {0} is absent in the consignment.
-    BundleAbsent(BundleId),
     /// anchor for transitio bundle {0} is absent in the consignment.
     AnchorAbsent(BundleId),
     /// witness id for transition bundle {0} is absent in the consignment.
@@ -262,6 +260,8 @@ pub enum Failure {
     ExtraKnownTransition(BundleId),
     /// transition claims ID {0} which differs from the actual one {1}
     TransitionIdMismatch(OpId, OpId),
+    /// found a transition {0} not in order.
+    UnorderedTransition(OpId),
 
     // Errors checking bundle commitments
     /// transition bundle {0} references non-existing input in witness {2} for
