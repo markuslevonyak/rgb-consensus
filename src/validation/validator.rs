@@ -416,30 +416,32 @@ impl<
         input_map: BTreeMap<OpId, BTreeSet<Outpoint>>,
     ) {
         let witness_id = pub_witness.txid();
-        for (vin, opids) in &bundle.input_map {
-            for opid in opids {
-                if self.trusted_op_seals.contains(&opid) {
-                    continue;
-                }
-                let Some(outpoints) = input_map.get(&opid) else {
-                    self.status
-                        .borrow_mut()
-                        .add_failure(Failure::MissingKnownTransition(bundle_id, opid));
-                    continue;
-                };
-                let Some(input) = pub_witness.inputs.get(vin.to_usize()) else {
-                    self.status
-                        .borrow_mut()
-                        .add_failure(Failure::BundleInvalidInput(bundle_id, opid, witness_id));
-                    continue;
-                };
-                if !outpoints.contains(&input.prev_output) {
-                    self.status
-                        .borrow_mut()
-                        .add_failure(Failure::BundleInvalidCommitment(
-                            bundle_id, *vin, witness_id, opid,
-                        ));
-                }
+
+        for (_opout, input_opid) in &bundle.input_map {
+            let opid = input_opid.opid;
+            let vin = input_opid.vin;
+
+            if self.trusted_op_seals.contains(&opid) {
+                continue;
+            }
+            let Some(outpoints) = input_map.get(&opid) else {
+                self.status
+                    .borrow_mut()
+                    .add_failure(Failure::MissingKnownTransition(bundle_id, opid));
+                continue;
+            };
+            let Some(input) = pub_witness.inputs.get(vin.to_usize()) else {
+                self.status
+                    .borrow_mut()
+                    .add_failure(Failure::BundleInvalidInput(bundle_id, opid, witness_id));
+                continue;
+            };
+            if !outpoints.contains(&input.prev_output) {
+                self.status
+                    .borrow_mut()
+                    .add_failure(Failure::BundleInvalidCommitment(
+                        bundle_id, vin, witness_id, opid,
+                    ));
             }
         }
     }

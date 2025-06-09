@@ -20,16 +20,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::{btree_set, BTreeSet};
-use std::iter;
+use std::collections::BTreeSet;
 
-use amplify::confinement::{NonEmptyOrdMap, NonEmptyOrdSet, U16 as U16MAX};
+use amplify::confinement::{NonEmptyOrdMap, U16 as U16MAX};
 use amplify::{Bytes32, Wrapper};
 use bp::Vout;
 use commit_verify::{mpc, CommitEncode, CommitEngine, CommitId, CommitmentId, DigestExt, Sha256};
 use strict_encoding::{StrictDumb, StrictEncode};
 
-use super::GraphSeal;
+use super::{GraphSeal, Opout};
 use crate::operation::operations::Operation;
 use crate::{OpId, Transition, LIB_NAME_RGB_COMMIT};
 
@@ -68,23 +67,26 @@ impl From<mpc::Message> for BundleId {
     fn from(id: mpc::Message) -> Self { BundleId(id.into_inner()) }
 }
 
-#[derive(Wrapper, WrapperMut, Clone, PartialEq, Eq, Hash, Debug, From)]
-#[wrapper(Deref)]
-#[wrapper_mut(DerefMut)]
-#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_RGB_COMMIT, dumb = Self(NonEmptyOrdSet::with(OpId::strict_dumb())))]
+#[derive(Clone, PartialEq, Eq, Hash, Debug, From)]
+#[derive(StrictType, StrictEncode, StrictDecode)]
+#[strict_type(lib = LIB_NAME_RGB_COMMIT)]
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
-    serde(crate = "serde_crate", transparent)
+    serde(crate = "serde_crate", rename_all = "camelCase")
 )]
-pub struct InputOpids(NonEmptyOrdSet<OpId, U16MAX>);
+pub struct InputOpid {
+    pub opid: OpId,
+    pub vin: Vin,
+}
 
-impl<'a> IntoIterator for &'a InputOpids {
-    type Item = OpId;
-    type IntoIter = iter::Copied<btree_set::Iter<'a, OpId>>;
-
-    fn into_iter(self) -> Self::IntoIter { self.0.iter().copied() }
+impl StrictDumb for InputOpid {
+    fn strict_dumb() -> Self {
+        Self {
+            opid: OpId::strict_dumb(),
+            vin: Vin::strict_dumb(),
+        }
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Display, Error)]
@@ -104,7 +106,7 @@ pub struct UnrelatedTransitions;
     serde(crate = "serde_crate", rename_all = "camelCase")
 )]
 pub struct TransitionBundle {
-    pub input_map: NonEmptyOrdMap<Vin, InputOpids, U16MAX>,
+    pub input_map: NonEmptyOrdMap<Opout, InputOpid, U16MAX>,
     pub known_transitions: NonEmptyOrdMap<OpId, Transition, U16MAX>,
 }
 
@@ -129,8 +131,8 @@ impl TransitionBundle {
     pub fn input_map_opids(&self) -> BTreeSet<OpId> {
         self.input_map
             .values()
-            .flat_map(|opids| opids.to_unconfined())
-            .collect::<BTreeSet<_>>()
+            .map(|input_opid| input_opid.opid.copy())
+            .collect()
     }
 
     pub fn known_transitions_opids(&self) -> BTreeSet<OpId> {
@@ -166,7 +168,7 @@ impl TransitionBundle {
         transition: Transition,
     ) -> Result<bool, UnrelatedTransition> {
         let opid = transition.id();
-        if self.input_map.values().all(|ids| !ids.contains(&opid)) {
+        if !self.input_map_opids().contains(&opid) {
             return Err(UnrelatedTransition(opid));
         }
         if self.known_transitions.contains_key(&opid) {
