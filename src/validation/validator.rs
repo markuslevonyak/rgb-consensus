@@ -383,6 +383,11 @@ impl<
                     .add_failure(Failure::AnchorAbsent(bundle_id));
                 continue;
             };
+            if bundle.check_opid_commitments().is_err() {
+                self.status
+                    .borrow_mut()
+                    .add_failure(Failure::ExtraKnownTransition(bundle.bundle_id()));
+            }
 
             // [VALIDATION]: We validate that the seals were properly defined on BP-type layer
             let (seals, input_map) = self.validate_seal_definitions(bundle);
@@ -419,7 +424,7 @@ impl<
                 let Some(outpoints) = input_map.get(&opid) else {
                     self.status
                         .borrow_mut()
-                        .add_failure(Failure::BundleExtraTransition(bundle_id, opid));
+                        .add_failure(Failure::MissingKnownTransition(bundle_id, opid));
                     continue;
                 };
                 let Some(input) = pub_witness.inputs.get(vin.to_usize()) else {

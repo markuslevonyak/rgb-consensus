@@ -20,7 +20,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::btree_set;
+use std::collections::{btree_set, BTreeSet};
 use std::iter;
 
 use amplify::confinement::{NonEmptyOrdMap, NonEmptyOrdSet, U16 as U16MAX};
@@ -91,6 +91,10 @@ impl<'a> IntoIterator for &'a InputOpids {
 #[display("state transition {0} is not a part of the bundle.")]
 pub struct UnrelatedTransition(OpId);
 
+#[derive(Clone, Eq, PartialEq, Debug, Display, Error)]
+#[display("detected uncommitted state transitions.")]
+pub struct UnrelatedTransitions;
+
 #[derive(Clone, PartialEq, Eq, Debug, From)]
 #[derive(StrictType, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_RGB_COMMIT)]
@@ -121,6 +125,29 @@ impl StrictDumb for TransitionBundle {
 
 impl TransitionBundle {
     pub fn bundle_id(&self) -> BundleId { self.commit_id() }
+
+    pub fn input_map_opids(&self) -> BTreeSet<OpId> {
+        self.input_map
+            .values()
+            .flat_map(|opids| opids.to_unconfined())
+            .collect::<BTreeSet<_>>()
+    }
+
+    pub fn known_transitions_opids(&self) -> BTreeSet<OpId> {
+        self.known_transitions
+            .keys()
+            .copied()
+            .collect::<BTreeSet<_>>()
+    }
+
+    pub fn check_opid_commitments(&self) -> Result<(), UnrelatedTransitions> {
+        let ids1 = self.known_transitions_opids();
+        let ids2 = self.input_map_opids();
+        if !ids1.is_subset(&ids2) {
+            return Err(UnrelatedTransitions);
+        }
+        Ok(())
+    }
 
     pub fn reveal_seal(&mut self, bundle_id: BundleId, seal: GraphSeal) -> bool {
         if self.bundle_id() != bundle_id {

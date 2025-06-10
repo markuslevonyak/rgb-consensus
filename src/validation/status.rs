@@ -257,11 +257,14 @@ pub enum Failure {
     ContractMismatch(OpId, ContractId),
     /// opout {0} appears more than once as input
     DoubleSpend(Opout),
+    /// transition bundle {0} known transitions references a state transition which is not
+    /// in the bundle input map.
+    ExtraKnownTransition(BundleId),
 
     // Errors checking bundle commitments
-    /// transition bundle {0} references state transition {1} which is not
-    /// included into the bundle input map.
-    BundleExtraTransition(BundleId, OpId),
+    /// transition bundle {0} input map references state transition {1} which is not
+    /// in the bundle known transitions.
+    MissingKnownTransition(BundleId, OpId),
     /// transition bundle {0} references non-existing input in witness {2} for
     /// the state transition {1}.
     BundleInvalidInput(BundleId, OpId, Txid),
