@@ -271,6 +271,8 @@ pub enum Failure {
     /// transition bundle {0} doesn't commit to the input {1} in the witness {2}
     /// which is an input of the state transition {3}.
     BundleInvalidCommitment(BundleId, Vin, Txid, OpId),
+    /// transition bundle {0} input map is missing an opout {1} in input on a known transition
+    MissingInputMapTransition(BundleId, OpId),
 
     // Errors checking seal closing
     /// transition {opid} references state type {state_type} absent in the

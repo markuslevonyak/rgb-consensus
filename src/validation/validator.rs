@@ -514,6 +514,11 @@ impl<
                         .borrow_mut()
                         .add_failure(Failure::DoubleSpend(input));
                 }
+                if !bundle.input_map.contains_key(&input) {
+                    self.status
+                        .borrow_mut()
+                        .add_failure(Failure::MissingInputMapTransition(bundle.bundle_id(), op));
+                }
 
                 let Some(prev_op) = self.consignment.operation(op) else {
                     // Node, referenced as the ancestor, was not found in the consignment.
