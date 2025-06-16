@@ -481,10 +481,15 @@ impl<
         let mut input_map: BTreeMap<OpId, BTreeSet<Outpoint>> = bmap!();
         let mut seals = vec![];
         for (opid, transition) in &bundle.known_transitions {
-            if self.trusted_op_seals.contains(opid) {
+            let opid = *opid;
+            if opid != transition.id() {
+                self.status
+                    .borrow_mut()
+                    .add_failure(Failure::TransitionIdMismatch(opid, transition.id()));
+            }
+            if self.trusted_op_seals.contains(&opid) {
                 continue;
             }
-            let opid = *opid;
 
             if !self.status.borrow_mut().validated_opids.insert(opid) {
                 self.status

@@ -260,6 +260,8 @@ pub enum Failure {
     /// transition bundle {0} known transitions references a state transition which is not
     /// in the bundle input map.
     ExtraKnownTransition(BundleId),
+    /// transition claims ID {0} which differs from the actual one {1}
+    TransitionIdMismatch(OpId, OpId),
 
     // Errors checking bundle commitments
     /// transition bundle {0} references non-existing input in witness {2} for
