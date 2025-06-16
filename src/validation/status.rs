@@ -262,9 +262,6 @@ pub enum Failure {
     ExtraKnownTransition(BundleId),
 
     // Errors checking bundle commitments
-    /// transition bundle {0} input map references state transition {1} which is not
-    /// in the bundle known transitions.
-    MissingKnownTransition(BundleId, OpId),
     /// transition bundle {0} references non-existing input in witness {2} for
     /// the state transition {1}.
     BundleInvalidInput(BundleId, OpId, Txid),
