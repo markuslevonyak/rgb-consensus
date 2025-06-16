@@ -416,27 +416,18 @@ impl<
         input_map: BTreeMap<OpId, BTreeSet<Outpoint>>,
     ) {
         let witness_id = pub_witness.txid();
+        let witness_inputs = BTreeSet::from_iter(pub_witness.inputs.iter().map(|i| i.prev_output));
 
-        for (_opout, input_opid) in &bundle.input_map {
-            let opid = input_opid.opid;
-            let vin = input_opid.vin;
-
-            if self.trusted_op_seals.contains(&opid) {
+        for (_opout, opid) in &bundle.input_map {
+            if self.trusted_op_seals.contains(opid) {
                 continue;
             }
-            if let Some(outpoints) = input_map.get(&opid) {
-                let Some(input) = pub_witness.inputs.get(vin.to_usize()) else {
+            if let Some(outpoints) = input_map.get(opid) {
+                if !outpoints.is_subset(&witness_inputs) {
                     self.status
                         .borrow_mut()
-                        .add_failure(Failure::BundleInvalidInput(bundle_id, opid, witness_id));
+                        .add_failure(Failure::WitnessMissingInput(bundle_id, *opid, witness_id));
                     continue;
-                };
-                if !outpoints.contains(&input.prev_output) {
-                    self.status
-                        .borrow_mut()
-                        .add_failure(Failure::BundleInvalidCommitment(
-                            bundle_id, vin, witness_id, opid,
-                        ));
                 }
             }
         }

@@ -34,7 +34,7 @@ use crate::schema::{self, SchemaId};
 use crate::validation::WitnessResolverError;
 use crate::{
     BundleId, ChainNet, ContractId, OccurrencesMismatch, OpFullType, OpId, Opout,
-    SealClosingStrategy, StateType, Vin,
+    SealClosingStrategy, StateType,
 };
 
 pub type UnsafeHistoryMap = HashMap<u32, HashSet<Txid>>;
@@ -264,10 +264,7 @@ pub enum Failure {
     // Errors checking bundle commitments
     /// transition bundle {0} references non-existing input in witness {2} for
     /// the state transition {1}.
-    BundleInvalidInput(BundleId, OpId, Txid),
-    /// transition bundle {0} doesn't commit to the input {1} in the witness {2}
-    /// which is an input of the state transition {3}.
-    BundleInvalidCommitment(BundleId, Vin, Txid, OpId),
+    WitnessMissingInput(BundleId, OpId, Txid),
     /// transition bundle {0} input map is missing an opout {1} in input on a known transition
     MissingInputMapTransition(BundleId, OpId),
 

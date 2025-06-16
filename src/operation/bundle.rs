@@ -67,28 +67,6 @@ impl From<mpc::Message> for BundleId {
     fn from(id: mpc::Message) -> Self { BundleId(id.into_inner()) }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug, From)]
-#[derive(StrictType, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_RGB_COMMIT)]
-#[cfg_attr(
-    feature = "serde",
-    derive(Serialize, Deserialize),
-    serde(crate = "serde_crate", rename_all = "camelCase")
-)]
-pub struct InputOpid {
-    pub opid: OpId,
-    pub vin: Vin,
-}
-
-impl StrictDumb for InputOpid {
-    fn strict_dumb() -> Self {
-        Self {
-            opid: OpId::strict_dumb(),
-            vin: Vin::strict_dumb(),
-        }
-    }
-}
-
 #[derive(Clone, Eq, PartialEq, Debug, Display, Error)]
 #[display("state transition {0} is not a part of the bundle.")]
 pub struct UnrelatedTransition(OpId);
@@ -106,7 +84,7 @@ pub struct UnrelatedTransitions;
     serde(crate = "serde_crate", rename_all = "camelCase")
 )]
 pub struct TransitionBundle {
-    pub input_map: NonEmptyOrdMap<Opout, InputOpid, U16MAX>,
+    pub input_map: NonEmptyOrdMap<Opout, OpId, U16MAX>,
     pub known_transitions: NonEmptyOrdMap<OpId, Transition, U16MAX>,
 }
 
@@ -128,12 +106,7 @@ impl StrictDumb for TransitionBundle {
 impl TransitionBundle {
     pub fn bundle_id(&self) -> BundleId { self.commit_id() }
 
-    pub fn input_map_opids(&self) -> BTreeSet<OpId> {
-        self.input_map
-            .values()
-            .map(|input_opid| input_opid.opid.copy())
-            .collect()
-    }
+    pub fn input_map_opids(&self) -> BTreeSet<OpId> { self.input_map.values().copied().collect() }
 
     pub fn known_transitions_opids(&self) -> BTreeSet<OpId> {
         self.known_transitions
