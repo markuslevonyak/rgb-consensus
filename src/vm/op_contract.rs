@@ -304,7 +304,8 @@ impl<S: ContractStateAccess> InstructionSet for ContractOp<S> {
                         .op_info
                         .prev_state
                         .get(state_type)
-                        .map(|a| a.len_u16()),
+                        .map(|a| a.len_u16())
+                        .unwrap_or(0),
                 );
             }
             ContractOp::CnS(state_type, reg) => {
@@ -315,7 +316,8 @@ impl<S: ContractStateAccess> InstructionSet for ContractOp<S> {
                         .op_info
                         .owned_state()
                         .get(*state_type)
-                        .map(|a| a.len_u16()),
+                        .map(|a| a.len_u16())
+                        .unwrap_or(0),
                 );
             }
             ContractOp::CnG(state_type, reg) => {
@@ -326,7 +328,8 @@ impl<S: ContractStateAccess> InstructionSet for ContractOp<S> {
                         .op_info
                         .global()
                         .get(state_type)
-                        .map(|a| a.len_u16()),
+                        .map(|a| a.len_u16())
+                        .unwrap_or(0),
                 );
             }
             ContractOp::CnC(state_type, reg) => {
@@ -334,7 +337,7 @@ impl<S: ContractStateAccess> InstructionSet for ContractOp<S> {
                 {
                     regs.set_n(RegA::A32, *reg, global.size().to_u32());
                 } else {
-                    regs.set_n(RegA::A32, *reg, None::<u32>);
+                    regs.set_n(RegA::A32, *reg, 0u32);
                 }
             }
             ContractOp::LdP(state_type, reg_32, reg) => {
