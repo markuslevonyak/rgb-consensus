@@ -21,6 +21,7 @@
 // limitations under the License.
 
 use std::collections::{btree_set, BTreeMap};
+use std::hash::{Hash, Hasher};
 use std::iter;
 use std::num::ParseIntError;
 use std::str::FromStr;
@@ -348,6 +349,10 @@ pub struct Transition {
 
 impl StrictSerialize for Transition {}
 impl StrictDeserialize for Transition {}
+
+impl Hash for Transition {
+    fn hash<H: Hasher>(&self, state: &mut H) { state.write(self.id().as_slice()) }
+}
 
 impl CommitEncode for Genesis {
     type CommitmentId = OpId;
