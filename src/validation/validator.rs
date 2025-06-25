@@ -36,8 +36,8 @@ use super::{CheckedConsignment, ConsignmentApi, EAnchor, Status, Validity};
 use crate::operation::seal::ExposedSeal;
 use crate::vm::{ContractStateAccess, ContractStateEvolve, OrdOpRef, WitnessOrd};
 use crate::{
-    validation, BundleId, ChainNet, ContractId, OpFullType, OpId, Operation, Opout, OutputSeal,
-    Schema, SchemaId, TransitionBundle,
+    validation, BundleId, ChainNet, ContractId, KnownTransition, OpFullType, OpId, Operation,
+    Opout, OutputSeal, Schema, SchemaId, TransitionBundle,
 };
 
 #[derive(Clone, PartialEq, Eq, Debug, Display, Error, From)]
@@ -305,9 +305,9 @@ impl<
                     }
                 }
             }
-            for op in bundle.known_transitions.values() {
+            for KnownTransition { transition, .. } in &bundle.known_transitions {
                 self.validate_operation(OrdOpRef::Transition(
-                    op,
+                    transition,
                     witness_id,
                     witness_ord,
                     bundle_id,
@@ -468,7 +468,7 @@ impl<
     ) -> (Vec<OutputSeal>, BTreeMap<OpId, BTreeSet<Outpoint>>) {
         let mut input_map: BTreeMap<OpId, BTreeSet<Outpoint>> = bmap!();
         let mut seals = vec![];
-        for (opid, transition) in &bundle.known_transitions {
+        for KnownTransition { opid, transition } in &bundle.known_transitions {
             let opid = *opid;
             if opid != transition.id() {
                 self.status

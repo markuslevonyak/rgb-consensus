@@ -22,7 +22,7 @@
 
 use std::collections::BTreeSet;
 
-use amplify::confinement::{NonEmptyOrdMap, U16 as U16MAX};
+use amplify::confinement::{NonEmptyOrdMap, NonEmptyVec, U16 as U16MAX};
 use amplify::{Bytes32, Wrapper};
 use bp::Vout;
 use commit_verify::{mpc, CommitEncode, CommitEngine, CommitId, CommitmentId, DigestExt, Sha256};
@@ -76,6 +76,23 @@ pub struct UnrelatedTransition(OpId);
 pub struct UnrelatedTransitions;
 
 #[derive(Clone, PartialEq, Eq, Debug, From)]
+#[derive(StrictType, StrictEncode, StrictDecode, StrictDumb)]
+#[strict_type(lib = LIB_NAME_RGB_COMMIT)]
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(crate = "serde_crate", rename_all = "camelCase")
+)]
+pub struct KnownTransition {
+    pub opid: OpId,
+    pub transition: Transition,
+}
+
+impl KnownTransition {
+    pub fn new(opid: OpId, transition: Transition) -> Self { Self { opid, transition } }
+}
+
+#[derive(Clone, PartialEq, Eq, Debug, From)]
 #[derive(StrictType, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_RGB_COMMIT)]
 #[cfg_attr(
@@ -85,7 +102,7 @@ pub struct UnrelatedTransitions;
 )]
 pub struct TransitionBundle {
     pub input_map: NonEmptyOrdMap<Opout, OpId, U16MAX>,
-    pub known_transitions: NonEmptyOrdMap<OpId, Transition, U16MAX>,
+    pub known_transitions: NonEmptyVec<KnownTransition, U16MAX>,
 }
 
 impl CommitEncode for TransitionBundle {
@@ -98,7 +115,7 @@ impl StrictDumb for TransitionBundle {
     fn strict_dumb() -> Self {
         Self {
             input_map: NonEmptyOrdMap::with_key_value(strict_dumb!(), strict_dumb!()),
-            known_transitions: NonEmptyOrdMap::with_key_value(strict_dumb!(), strict_dumb!()),
+            known_transitions: NonEmptyVec::with(strict_dumb!()),
         }
     }
 }
@@ -110,8 +127,8 @@ impl TransitionBundle {
 
     pub fn known_transitions_opids(&self) -> BTreeSet<OpId> {
         self.known_transitions
-            .keys()
-            .copied()
+            .iter()
+            .map(|kt| kt.opid)
             .collect::<BTreeSet<_>>()
     }
 
@@ -124,13 +141,27 @@ impl TransitionBundle {
         Ok(())
     }
 
+    pub fn known_transitions_contain_opid(&self, opid: &OpId) -> bool {
+        self.known_transitions.iter().any(|kt| &kt.opid == opid)
+    }
+
+    pub fn get_transition(&self, opid: OpId) -> Option<&Transition> {
+        self.known_transitions.iter().find_map(|kt| {
+            if kt.opid == opid {
+                Some(&kt.transition)
+            } else {
+                None
+            }
+        })
+    }
+
     pub fn reveal_seal(&mut self, bundle_id: BundleId, seal: GraphSeal) -> bool {
         if self.bundle_id() != bundle_id {
             return false;
         }
         self.known_transitions
-            .values_mut()
-            .flat_map(|t| t.assignments.values_mut())
+            .iter_mut()
+            .flat_map(|kt| kt.transition.assignments.values_mut())
             .for_each(|a| a.reveal_seal(seal));
 
         true
@@ -144,11 +175,11 @@ impl TransitionBundle {
         if !self.input_map_opids().contains(&opid) {
             return Err(UnrelatedTransition(opid));
         }
-        if self.known_transitions.contains_key(&opid) {
+        if self.known_transitions_contain_opid(&opid) {
             return Ok(false);
         }
         self.known_transitions
-            .insert(opid, transition)
+            .push(KnownTransition { opid, transition })
             .expect("same size as input map");
         Ok(true)
     }
