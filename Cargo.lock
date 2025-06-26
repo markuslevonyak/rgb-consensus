@@ -669,7 +669,7 @@ dependencies = [
 
 [[package]]
 name = "rgb-consensus"
-version = "0.11.1-alpha.3+unreviewed"
+version = "0.11.1-rc.1"
 dependencies = [
  "aluvm",
  "amplify",
