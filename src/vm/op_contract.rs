@@ -437,9 +437,11 @@ impl<S: ContractStateAccess> InstructionSet for ContractOp<S> {
                 else {
                     fail!()
                 };
-                let Some(output_amt) = load_revealed_outputs!(state_type)
-                    .iter()
-                    .try_fold(0u64, |acc, &x| acc.checked_add(x))
+                let outputs = load_revealed_outputs!(state_type);
+                if outputs.contains(&0) {
+                    fail!()
+                }
+                let Some(output_amt) = outputs.iter().try_fold(0u64, |acc, &x| acc.checked_add(x))
                 else {
                     fail!()
                 };
