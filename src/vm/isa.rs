@@ -1,4 +1,4 @@
-// RGB Core Library: consensus layer for RGB smart contracts.
+// RGB Consensus Library: consensus layer for RGB smart contracts.
 //
 // SPDX-License-Identifier: Apache-2.0
 //

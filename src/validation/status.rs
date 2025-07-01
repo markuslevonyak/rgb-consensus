@@ -1,4 +1,4 @@
-// RGB Core Library: consensus layer for RGB smart contracts.
+// RGB Consensus Library: consensus layer for RGB smart contracts.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -324,7 +324,7 @@ pub enum Failure {
     /// contract state can't fit more data (at operation id {0}).
     ContractStateFilled(OpId),
 
-    /// Custom error by external services on top of RGB Core.
+    /// Custom error by external services on top of RGB Consensus.
     #[display(inner)]
     Custom(String),
 }
@@ -340,7 +340,7 @@ pub enum Warning {
     /// Map of transfer history TXs with potentially unsafe height.
     UnsafeHistory(UnsafeHistoryMap),
 
-    /// Custom warning by external services on top of RGB Core.
+    /// Custom warning by external services on top of RGB Consensus.
     #[display(inner)]
     Custom(String),
 }
@@ -353,7 +353,7 @@ pub enum Warning {
 )]
 #[display(doc_comments)]
 pub enum Info {
-    /// Custom info by external services on top of RGB Core.
+    /// Custom info by external services on top of RGB Consensus.
     #[display(inner)]
     Custom(String),
 }

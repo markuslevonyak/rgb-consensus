@@ -668,7 +668,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rgb-core"
+name = "rgb-consensus"
 version = "0.11.1-alpha.3+unreviewed"
 dependencies = [
  "aluvm",
