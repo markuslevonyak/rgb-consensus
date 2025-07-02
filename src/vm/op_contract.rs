@@ -37,7 +37,7 @@ use secp256k1::{ecdsa, Message, PublicKey};
 
 use super::opcodes::*;
 use super::{ContractStateAccess, VmContext};
-use crate::vm::OrdOpRef;
+use crate::vm::{GlobalsIter, OrdOpRef};
 use crate::{Assign, AssignmentType, GlobalStateType, MetaType, TypedAssigns};
 
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, Display)]
@@ -333,9 +333,8 @@ impl<S: ContractStateAccess> InstructionSet for ContractOp<S> {
                 );
             }
             ContractOp::CnC(state_type, reg) => {
-                if let Ok(mut global) = RefCell::borrow(&context.contract_state).global(*state_type)
-                {
-                    regs.set_n(RegA::A32, *reg, global.size().to_u32());
+                if let Ok(global) = RefCell::borrow(&context.contract_state).global(*state_type) {
+                    regs.set_n(RegA::A32, *reg, global.count() as u32);
                 } else {
                     regs.set_n(RegA::A32, *reg, 0u32);
                 }
@@ -409,7 +408,7 @@ impl<S: ContractStateAccess> InstructionSet for ContractOp<S> {
 
             ContractOp::LdC(state_type, reg_32, reg_s) => {
                 let state = RefCell::borrow(&context.contract_state);
-                let Ok(mut global) = state.global(*state_type) else {
+                let Ok(global) = state.global(*state_type) else {
                     fail!()
                 };
                 let Some(reg_32) = *regs.get_n(RegA::A32, *reg_32) else {
@@ -419,10 +418,10 @@ impl<S: ContractStateAccess> InstructionSet for ContractOp<S> {
                 let Ok(index) = u24::try_from(index) else {
                     fail!()
                 };
-                let Some(state) = global.nth(index) else {
+                let Some(state) = global.at_depth(index.to_usize()) else {
                     fail!()
                 };
-                regs.set_s16(*reg_s, state.borrow().as_inner());
+                regs.set_s16(*reg_s, state.borrow().data().as_inner());
             }
             ContractOp::LdM(type_id, reg) => {
                 let Some(meta) = context.op_info.metadata().get(type_id) else {

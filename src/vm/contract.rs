@@ -27,7 +27,6 @@ use std::fmt::{self, Debug, Display, Formatter};
 use std::num::NonZeroU32;
 use std::rc::Rc;
 
-use amplify::num::u24;
 use bp::{BlockHeight, Outpoint, Txid};
 use chrono::{MappedLocalTime, TimeZone, Utc};
 use strict_encoding::{StrictDecode, StrictDumb, StrictEncode};
@@ -391,88 +390,20 @@ impl GlobalOrd {
     }
 }
 
-pub trait GlobalStateIter {
-    type Data: Borrow<RevealedData>;
-    fn size(&mut self) -> u24;
-    fn prev(&mut self) -> Option<(GlobalOrd, Self::Data)>;
-    fn last(&mut self) -> Option<(GlobalOrd, Self::Data)>;
-    fn reset(&mut self, depth: u24);
+pub trait GlobalsIter: Iterator {
+    /// Returns the global value at a certain depth
+    /// Similar to Iterator::nth, but it doesn't modify self
+    fn at_depth(&self, depth: usize) -> Option<Self::Item>;
 }
 
-impl<I: GlobalStateIter> GlobalStateIter for &mut I {
-    type Data = I::Data;
-
-    #[inline]
-    fn size(&mut self) -> u24 { GlobalStateIter::size(*self) }
-
-    #[inline]
-    fn prev(&mut self) -> Option<(GlobalOrd, Self::Data)> { (*self).prev() }
-
-    #[inline]
-    fn last(&mut self) -> Option<(GlobalOrd, Self::Data)> { (*self).last() }
-
-    #[inline]
-    fn reset(&mut self, depth: u24) { (*self).reset(depth) }
+#[derive(Eq, PartialEq, Ord, PartialOrd, Clone, Getters)]
+pub struct GlobalStateEntry {
+    ord: GlobalOrd,
+    data: RevealedData,
 }
 
-pub struct GlobalContractState<I: GlobalStateIter> {
-    checked_depth: u24,
-    last_ord: Option<GlobalOrd>,
-    iter: I,
-}
-
-impl<I: GlobalStateIter> GlobalContractState<I> {
-    #[inline]
-    pub fn new(iter: I) -> Self {
-        Self {
-            iter,
-            checked_depth: u24::ONE,
-            last_ord: None,
-        }
-    }
-
-    #[inline]
-    pub fn size(&mut self) -> u24 { self.iter.size() }
-
-    fn prev_checked(&mut self) -> Option<(GlobalOrd, I::Data)> {
-        let (ord, item) = self.iter.prev()?;
-        self.checked_depth += u24::ONE;
-        self.last_ord = Some(ord);
-        Some((ord, item))
-    }
-
-    /// Retrieves global state data located `depth` items back from the most
-    /// recent global state value. Ensures that the global state ordering is
-    /// consensus-based.
-    pub fn nth(&mut self, depth: u24) -> Option<impl Borrow<RevealedData> + '_> {
-        if depth > self.iter.size() {
-            return None;
-        }
-        if depth >= self.checked_depth {
-            self.iter.reset(depth);
-        } else {
-            self.iter.reset(self.checked_depth);
-            let size = self.iter.size();
-            let to = (self.checked_depth - depth).to_u32();
-            for inc in 0..to {
-                if self.prev_checked().is_none() {
-                    panic!(
-                        "global contract state iterator has invalid implementation: it reports \
-                         more global state items {size} than the contract has ({})",
-                        self.checked_depth + inc
-                    );
-                }
-            }
-        }
-        self.iter.last().map(|(_, item)| item)
-    }
-}
-
-impl<I: GlobalStateIter> Iterator for GlobalContractState<I> {
-    type Item = I::Data;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> { Some(self.prev_checked()?.1) }
+impl GlobalStateEntry {
+    pub fn new(ord: GlobalOrd, data: RevealedData) -> Self { Self { ord, data } }
 }
 
 #[derive(Copy, Clone, Debug, Display, Error)]
@@ -483,7 +414,7 @@ pub trait ContractStateAccess: Debug {
     fn global(
         &self,
         ty: GlobalStateType,
-    ) -> Result<GlobalContractState<impl GlobalStateIter>, UnknownGlobalStateType>;
+    ) -> Result<impl GlobalsIter<Item = impl Borrow<GlobalStateEntry>>, UnknownGlobalStateType>;
 
     fn rights(&self, outpoint: Outpoint, ty: AssignmentType) -> u32;
 
