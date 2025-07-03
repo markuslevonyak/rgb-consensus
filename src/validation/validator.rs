@@ -494,7 +494,7 @@ impl<
                         .borrow_mut()
                         .add_failure(Failure::DoubleSpend(input));
                 }
-                if !bundle.input_map.contains_key(&input) {
+                if bundle.input_map.get(&input).map_or(true, |v| *v != opid) {
                     self.status
                         .borrow_mut()
                         .add_failure(Failure::MissingInputMapTransition(bundle.bundle_id(), op));
