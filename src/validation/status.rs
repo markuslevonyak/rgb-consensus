@@ -24,6 +24,7 @@ use core::ops::AddAssign;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt::{self, Display, Formatter};
 
+use aluvm::library::LibId;
 use amplify::num::u24;
 use bp::seals::txout::CloseMethod;
 use bp::Txid;
@@ -323,6 +324,10 @@ pub enum Failure {
     ScriptFailure(OpId, Option<u8>, Option<String>),
     /// contract state can't fit more data (at operation id {0}).
     ContractStateFilled(OpId),
+    /// operation {0} commits to a missing script {1}.
+    MissingScript(OpId, LibId),
+    /// operation {0} commits to a script which ID {1} doesn't match the actual one {2}.
+    ScriptIDMismatch(OpId, LibId, LibId),
 
     /// Custom error by external services on top of RGB Consensus.
     #[display(inner)]

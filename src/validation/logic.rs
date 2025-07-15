@@ -157,6 +157,18 @@ impl Schema {
             if let Some(ty) = ty {
                 vm.registers.set_n(RegA::A16, Reg32::Reg0, ty);
             }
+            if let Some(script) = scripts.get(&validator.lib) {
+                let script_id = script.id();
+                if script_id != validator.lib {
+                    status.add_failure(validation::Failure::ScriptIDMismatch(
+                        opid,
+                        validator.lib,
+                        script_id,
+                    ));
+                }
+            } else {
+                status.add_failure(validation::Failure::MissingScript(opid, validator.lib));
+            }
             if !vm.exec(validator, |id| scripts.get(&id), &context) {
                 let error_code: Option<Number> = vm.registers.get_n(RegA::A8, Reg32::Reg0).into();
                 status.add_failure(validation::Failure::ScriptFailure(
