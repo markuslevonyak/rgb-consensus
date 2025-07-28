@@ -248,10 +248,6 @@ pub enum Failure {
     AnchorAbsent(BundleId),
     /// witness id for transition bundle {0} is absent in the consignment.
     WitnessIdAbsent(BundleId),
-    /// bundle {0} public witness {1} is not known to the resolver; validation
-    /// stopped since operations can't be consensus-ordered. The resolver
-    /// responded with error {2}
-    WitnessUnresolved(BundleId, Txid, WitnessResolverError),
     /// operation {0} is under a different contract {1}.
     ContractMismatch(OpId, ContractId),
     /// opout {0} appears more than once as input

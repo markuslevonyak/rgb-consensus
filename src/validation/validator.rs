@@ -36,10 +36,11 @@ use super::{CheckedConsignment, ConsignmentApi, EAnchor, Status, Validity};
 use crate::operation::seal::ExposedSeal;
 use crate::vm::{ContractStateAccess, ContractStateEvolve, OrdOpRef, WitnessOrd};
 use crate::{
-    validation, BundleId, ChainNet, ContractId, KnownTransition, OpFullType, OpId, Operation,
-    Opout, OutputSeal, Schema, SchemaId, TransitionBundle,
+    BundleId, ChainNet, ContractId, KnownTransition, OpFullType, OpId, Operation, Opout,
+    OutputSeal, Schema, SchemaId, TransitionBundle,
 };
 
+/// Error resolving witness.
 #[derive(Clone, PartialEq, Eq, Debug, Display, Error, From)]
 #[display(doc_comments)]
 #[cfg_attr(
@@ -52,31 +53,50 @@ pub enum WitnessResolverError {
     IdMismatch { actual: Txid, expected: Txid },
     /// witness {0} does not exist.
     Unknown(Txid),
-    /// unable to retrieve witness {0}, {1}
-    Other(Txid, String),
+    /// unable to retrieve information from the resolver (TXID: {0:?}), {1}
+    ResolverIssue(Option<Txid>, String),
+    /// resolver returned invalid data
+    InvalidResolverData,
     /// resolver is for another chain-network pair
     WrongChainNet,
 }
 
+/// Trait to provide the [`WitnessOrd`] for a specific TX.
+pub trait WitnessOrdProvider {
+    /// Provide the [`WitnessOrd`] for a TX with the given `witness_id`.
+    fn witness_ord(&self, witness_id: Txid) -> Result<WitnessOrd, WitnessResolverError>;
+}
+
+/// Trait to resolve a witness TX.
 pub trait ResolveWitness {
-    fn resolve_pub_witness(&self, witness_id: Txid) -> Result<Tx, WitnessResolverError>;
+    /// Provide the [`WitnessStatus`] for a TX with the given `witness_id`.
+    fn resolve_witness(&self, witness_id: Txid) -> Result<WitnessStatus, WitnessResolverError>;
 
-    fn resolve_pub_witness_ord(&self, witness_id: Txid)
-        -> Result<WitnessOrd, WitnessResolverError>;
-
+    /// Check that the resolver works with the expected [`ChainNet`].
     fn check_chain_net(&self, chain_net: ChainNet) -> Result<(), WitnessResolverError>;
 }
 
-impl<T: ResolveWitness> ResolveWitness for &T {
-    fn resolve_pub_witness(&self, witness_id: Txid) -> Result<Tx, WitnessResolverError> {
-        ResolveWitness::resolve_pub_witness(*self, witness_id)
-    }
+/// Resolve status of a witness TX.
+pub enum WitnessStatus {
+    /// TX has not been found.
+    Unresolved,
+    /// TX has been found.
+    Resolved(Tx, WitnessOrd),
+}
 
-    fn resolve_pub_witness_ord(
-        &self,
-        witness_id: Txid,
-    ) -> Result<WitnessOrd, WitnessResolverError> {
-        ResolveWitness::resolve_pub_witness_ord(*self, witness_id)
+impl WitnessStatus {
+    /// Return the [`WitnessOrd`] for this [`WitnessStatus`].
+    pub fn witness_ord(&self) -> WitnessOrd {
+        match self {
+            Self::Unresolved => WitnessOrd::Archived,
+            Self::Resolved(_, ord) => *ord,
+        }
+    }
+}
+
+impl<T: ResolveWitness> ResolveWitness for &T {
+    fn resolve_witness(&self, witness_id: Txid) -> Result<WitnessStatus, WitnessResolverError> {
+        ResolveWitness::resolve_witness(*self, witness_id)
     }
 
     fn check_chain_net(&self, chain_net: ChainNet) -> Result<(), WitnessResolverError> {
@@ -93,24 +113,19 @@ impl<R: ResolveWitness> From<R> for CheckedWitnessResolver<R> {
 }
 
 impl<R: ResolveWitness> ResolveWitness for CheckedWitnessResolver<R> {
-    fn resolve_pub_witness(&self, witness_id: Txid) -> Result<Tx, WitnessResolverError> {
-        let witness = self.inner.resolve_pub_witness(witness_id)?;
-        let actual_id = witness.txid();
-        if actual_id != witness_id {
-            return Err(WitnessResolverError::IdMismatch {
-                actual: actual_id,
-                expected: witness_id,
-            });
-        }
-        Ok(witness)
-    }
-
     #[inline]
-    fn resolve_pub_witness_ord(
-        &self,
-        witness_id: Txid,
-    ) -> Result<WitnessOrd, WitnessResolverError> {
-        self.inner.resolve_pub_witness_ord(witness_id)
+    fn resolve_witness(&self, witness_id: Txid) -> Result<WitnessStatus, WitnessResolverError> {
+        let witness_status = self.inner.resolve_witness(witness_id)?;
+        if let WitnessStatus::Resolved(tx, _ord) = &witness_status {
+            let actual_id = tx.txid();
+            if actual_id != witness_id {
+                return Err(WitnessResolverError::IdMismatch {
+                    actual: actual_id,
+                    expected: witness_id,
+                });
+            }
+        }
+        Ok(witness_status)
     }
 
     fn check_chain_net(&self, chain_net: ChainNet) -> Result<(), WitnessResolverError> {
@@ -135,6 +150,8 @@ pub struct Validator<
 
     contract_state: Rc<RefCell<S>>,
     input_assignments: RefCell<BTreeSet<Opout>>,
+
+    tx_ord_map: RefCell<HashMap<Txid, WitnessOrd>>,
 
     // Operations in this set will not be validated
     trusted_op_seals: BTreeSet<OpId>,
@@ -170,6 +187,8 @@ impl<
 
         let input_transitions = RefCell::new(BTreeSet::<Opout>::new());
 
+        let tx_ord_map = RefCell::new(HashMap::<Txid, WitnessOrd>::new());
+
         Self {
             consignment,
             status: RefCell::new(status),
@@ -178,6 +197,7 @@ impl<
             chain_net,
             trusted_op_seals,
             input_assignments: input_transitions,
+            tx_ord_map,
             resolver: CheckedWitnessResolver::from(resolver),
             contract_state: Rc::new(RefCell::new(S::init(context))),
             safe_height,
@@ -273,22 +293,16 @@ impl<
 
         // [VALIDATION]: Iterating over all consignment operations
         let mut unsafe_history_map: HashMap<u32, HashSet<Txid>> = HashMap::new();
+        let tx_ord_map = self.tx_ord_map.borrow();
         for bundle in self.consignment.bundles() {
             let bundle_id = bundle.bundle_id();
             let (witness_id, _) = self
                 .consignment
                 .anchor(bundle_id)
                 .expect("invalid checked consignment");
-            let witness_ord =
-                match self.resolver.resolve_pub_witness_ord(witness_id) {
-                    Ok(ord) => ord,
-                    Err(err) => {
-                        self.status.borrow_mut().add_failure(
-                            validation::Failure::WitnessUnresolved(bundle_id, witness_id, err),
-                        );
-                        return;
-                    }
-                };
+            let witness_ord = tx_ord_map
+                .get(&witness_id)
+                .expect("every TX has been already successfully resolved at this point");
             if let Some(safe_height) = self.safe_height {
                 match witness_ord {
                     WitnessOrd::Mined(witness_pos) => {
@@ -309,7 +323,7 @@ impl<
                 self.validate_operation(OrdOpRef::Transition(
                     transition,
                     witness_id,
-                    witness_ord,
+                    *witness_ord,
                     bundle_id,
                 ));
             }
@@ -434,7 +448,7 @@ impl<
         // transition inputs.
         // Here the method can do SPV proof instead of querying the indexer. The SPV
         // proofs can be part of the consignments, but do not require .
-        match self.resolver.resolve_pub_witness(witness_id) {
+        match self.resolver.resolve_witness(witness_id) {
             Err(err) => {
                 // We wre unable to retrieve corresponding transaction, so can't check.
                 // Reporting this incident and continuing further. Why this happens? No
@@ -450,12 +464,25 @@ impl<
                     .add_failure(Failure::SealNoPubWitness(bundle_id, witness_id, err));
                 None
             }
-            Ok(pub_witness) => {
-                let seals = seals.as_ref();
-                let witness = Witness::with(pub_witness.clone(), anchor.dbc_proof.clone());
-                self.validate_seal_closing(seals, bundle_id, witness, anchor.mpc_proof.clone());
-                Some(pub_witness)
-            }
+            Ok(witness_status) => match witness_status {
+                WitnessStatus::Resolved(tx, ord) if ord != WitnessOrd::Archived => {
+                    let seals = seals.as_ref();
+                    let witness = Witness::with(tx.clone(), anchor.dbc_proof.clone());
+                    self.tx_ord_map.borrow_mut().insert(witness.txid, ord);
+                    self.validate_seal_closing(seals, bundle_id, witness, anchor.mpc_proof.clone());
+                    Some(tx)
+                }
+                _ => {
+                    self.status
+                        .borrow_mut()
+                        .add_failure(Failure::SealNoPubWitness(
+                            bundle_id,
+                            witness_id,
+                            WitnessResolverError::Unknown(witness_id),
+                        ));
+                    None
+                }
+            },
         }
     }
 

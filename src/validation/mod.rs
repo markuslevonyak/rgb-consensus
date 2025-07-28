@@ -30,4 +30,6 @@ mod commitments;
 pub use commitments::{DbcError, DbcProof, EAnchor};
 pub use consignment::{CheckedConsignment, ConsignmentApi, OpRef, Scripts, CONSIGNMENT_MAX_LIBS};
 pub use status::{Failure, Info, Status, UnsafeHistoryMap, Validity, Warning};
-pub use validator::{ResolveWitness, Validator, WitnessResolverError};
+pub use validator::{
+    ResolveWitness, Validator, WitnessOrdProvider, WitnessResolverError, WitnessStatus,
+};
