@@ -29,7 +29,7 @@ use amplify::num::u24;
 use bp::seals::txout::CloseMethod;
 use bp::Txid;
 use commit_verify::mpc::InvalidProof;
-use strict_types::SemId;
+use strict_types::{SemId, Ty};
 
 use crate::schema::{self, SchemaId};
 use crate::validation::WitnessResolverError;
@@ -187,6 +187,8 @@ pub enum Failure {
         actual: SchemaId,
     },
 
+    /// type with sem_id {0} does not match the trusted one {1:?} (found {2})
+    TypeSystemMismatch(SemId, Option<Ty<SemId>>, Ty<SemId>),
     /// schema global state #{0} uses semantic data type absent in type library
     /// ({1}).
     SchemaGlobalSemIdUnknown(schema::GlobalStateType, SemId),

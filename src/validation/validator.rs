@@ -30,6 +30,7 @@ use bp::seals::txout::{CloseMethod, Witness};
 use bp::{dbc, Outpoint, Tx, Txid};
 use commit_verify::mpc;
 use single_use_seals::SealWitness;
+use strict_types::TypeSystem;
 
 use super::status::{Failure, Warning};
 use super::{CheckedConsignment, ConsignmentApi, EAnchor, Status, Validity};
@@ -37,7 +38,7 @@ use crate::operation::seal::ExposedSeal;
 use crate::vm::{ContractStateAccess, ContractStateEvolve, OrdOpRef, WitnessOrd};
 use crate::{
     BundleId, ChainNet, ContractId, KnownTransition, OpFullType, OpId, Operation, Opout,
-    OutputSeal, Schema, SchemaId, TransitionBundle,
+    OutputSeal, SchemaId, TransitionBundle,
 };
 
 /// Error resolving witness.
@@ -157,6 +158,7 @@ pub struct Validator<
     trusted_op_seals: BTreeSet<OpId>,
     resolver: CheckedWitnessResolver<&'resolver R>,
     safe_height: Option<NonZeroU32>,
+    trusted_typesystem: TypeSystem,
 }
 
 impl<
@@ -173,6 +175,7 @@ impl<
         context: S::Context<'_>,
         safe_height: Option<NonZeroU32>,
         trusted_op_seals: BTreeSet<OpId>,
+        trusted_typesystem: TypeSystem,
     ) -> Self {
         // We use validation status object to store all detected failures and
         // warnings
@@ -201,6 +204,7 @@ impl<
             resolver: CheckedWitnessResolver::from(resolver),
             contract_state: Rc::new(RefCell::new(S::init(context))),
             safe_height,
+            trusted_typesystem,
         }
     }
 
@@ -220,9 +224,16 @@ impl<
         context: S::Context<'_>,
         safe_height: Option<NonZeroU32>,
         trusted_op_seals: BTreeSet<OpId>,
+        trusted_typesystem: TypeSystem,
     ) -> Status {
-        let mut validator =
-            Self::init(consignment, resolver, context, safe_height, trusted_op_seals);
+        let mut validator = Self::init(
+            consignment,
+            resolver,
+            context,
+            safe_height,
+            trusted_op_seals,
+            trusted_typesystem,
+        );
         // If the chain-network pair doesn't match there is no point in validating the contract
         // since all witness transactions will be missed.
         if validator.chain_net != chain_net {
@@ -240,7 +251,7 @@ impl<
             return validator.status.into_inner();
         }
 
-        validator.validate_schema(consignment.schema());
+        validator.validate_schema();
         // We must return here, since if the schema is not valid there is no reason to
         // validate contract nodes against it: it will produce a plenty of errors.
         if validator.status.borrow().validity() == Validity::Invalid {
@@ -261,8 +272,21 @@ impl<
     }
 
     // *** PART I: Schema validation
-    fn validate_schema(&mut self, schema: &Schema) {
-        *self.status.borrow_mut() += schema.verify(self.consignment.types());
+    fn validate_schema(&mut self) {
+        for (sem_id, consignment_type) in self.consignment.types().iter() {
+            let trusted_type = self.trusted_typesystem.get(*sem_id);
+            if trusted_type != Some(consignment_type) {
+                self.status
+                    .borrow_mut()
+                    .add_failure(Failure::TypeSystemMismatch(
+                        *sem_id,
+                        trusted_type.cloned(),
+                        consignment_type.clone(),
+                    ));
+                return;
+            }
+        }
+        *self.status.borrow_mut() += self.consignment.schema().verify(self.consignment.types());
     }
 
     // *** PART II: Validating business logic
