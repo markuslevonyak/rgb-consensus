@@ -63,7 +63,7 @@ pub struct Status {
     pub failures: Vec<Failure>,
     pub warnings: Vec<Warning>,
     pub info: Vec<Info>,
-    pub validated_opids: BTreeSet<OpId>,
+    pub input_opouts: BTreeSet<Opout>,
 }
 
 impl Display for Status {
@@ -111,7 +111,7 @@ impl Status {
             failures: vec![v],
             warnings: vec![],
             info: vec![],
-            validated_opids: bset![],
+            input_opouts: bset![],
         }
     }
 }

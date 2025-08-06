@@ -164,6 +164,8 @@ pub struct Validator<
 
     tx_ord_map: RefCell<HashMap<Txid, WitnessOrd>>,
 
+    validated_opids: RefCell<BTreeSet<OpId>>,
+
     // Operations in this set will not be validated
     trusted_op_seals: BTreeSet<OpId>,
     resolver: CheckedWitnessResolver<&'resolver R>,
@@ -202,6 +204,8 @@ impl<
 
         let tx_ord_map = RefCell::new(HashMap::<Txid, WitnessOrd>::new());
 
+        let validated_opids = RefCell::new(BTreeSet::<OpId>::new());
+
         Self {
             consignment,
             status: RefCell::new(status),
@@ -211,6 +215,7 @@ impl<
             trusted_op_seals,
             input_assignments: input_transitions,
             tx_ord_map,
+            validated_opids,
             resolver: CheckedWitnessResolver::from(resolver),
             contract_state: Rc::new(RefCell::new(S::init(context))),
             safe_height,
@@ -382,7 +387,7 @@ impl<
                 .add_failure(Failure::ContractMismatch(opid, operation.contract_id()));
         }
 
-        if !self.status.borrow_mut().validated_opids.contains(&opid)
+        if !self.validated_opids.borrow().contains(&opid)
             && matches!(operation.full_type(), OpFullType::StateTransition(_))
         {
             self.status
@@ -540,7 +545,7 @@ impl<
                 continue;
             }
 
-            if !self.status.borrow_mut().validated_opids.insert(opid) {
+            if !self.validated_opids.borrow_mut().insert(opid) {
                 self.status
                     .borrow_mut()
                     .add_failure(Failure::CyclicGraph(opid));
@@ -570,7 +575,7 @@ impl<
                     continue;
                 };
 
-                if !self.status.borrow().validated_opids.contains(&op)
+                if !self.validated_opids.borrow().contains(&op)
                     && prev_op.full_type().is_transition()
                     && !self.trusted_op_seals.contains(&op)
                 {
@@ -621,6 +626,7 @@ impl<
                     .entry(opid)
                     .or_default()
                     .insert(Outpoint::new(seal.txid, seal.vout));
+                self.status.borrow_mut().input_opouts.insert(input);
             }
         }
         (seals, input_map)
