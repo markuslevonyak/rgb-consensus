@@ -38,7 +38,7 @@ use crate::operation::seal::ExposedSeal;
 use crate::vm::{ContractStateAccess, ContractStateEvolve, OrdOpRef, WitnessOrd};
 use crate::{
     BundleId, ChainNet, ContractId, KnownTransition, OpFullType, OpId, Operation, Opout,
-    OutputSeal, SchemaId, TransitionBundle,
+    OutputSeal, SchemaId, TransitionBundle, LIB_NAME_RGB_LOGIC,
 };
 
 /// Error resolving witness.
@@ -78,8 +78,18 @@ pub trait ResolveWitness {
 }
 
 /// Resolve status of a witness TX.
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Display, From)]
+#[display(lowercase)]
+#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+#[strict_type(lib = LIB_NAME_RGB_LOGIC, tags = order)]
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(crate = "serde_crate", rename_all = "camelCase")
+)]
 pub enum WitnessStatus {
     /// TX has not been found.
+    #[strict_type(dumb)]
     Unresolved,
     /// TX has been found.
     Resolved(Tx, WitnessOrd),
