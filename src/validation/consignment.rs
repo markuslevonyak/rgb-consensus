@@ -117,7 +117,7 @@ impl<C: ConsignmentApi> ConsignmentApi for CheckedConsignment<'_, C> {
 
     fn scripts(&self) -> &Scripts { self.0.scripts() }
 
-    fn operation(&self, opid: OpId) -> Option<OpRef> {
+    fn operation(&self, opid: OpId) -> Option<OpRef<'_>> {
         self.0.operation(opid).filter(|op| op.id() == opid)
     }
 
@@ -158,7 +158,7 @@ pub trait ConsignmentApi {
 
     /// Retrieves reference to an operation (genesis or state transition) matching the provided id,
     /// or `None` otherwise
-    fn operation(&self, opid: OpId) -> Option<OpRef>;
+    fn operation(&self, opid: OpId) -> Option<OpRef<'_>>;
 
     /// Contract genesis.
     fn genesis(&self) -> &Genesis;

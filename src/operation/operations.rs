@@ -193,7 +193,7 @@ pub trait Operation {
     /// wrapper structure) for the contract operation.
     fn globals(&self) -> &GlobalState;
 
-    fn assignments(&self) -> AssignmentsRef;
+    fn assignments(&self) -> AssignmentsRef<'_>;
 
     fn assignments_by_type(&self, t: AssignmentType) -> Option<TypedAssigns<GraphSeal>>;
 
@@ -391,7 +391,7 @@ impl Operation for Genesis {
     fn globals(&self) -> &GlobalState { &self.globals }
 
     #[inline]
-    fn assignments(&self) -> AssignmentsRef { (&self.assignments).into() }
+    fn assignments(&self) -> AssignmentsRef<'_> { (&self.assignments).into() }
 
     #[inline]
     fn assignments_by_type(&self, t: AssignmentType) -> Option<TypedAssigns<GraphSeal>> {
@@ -421,7 +421,7 @@ impl Operation for Transition {
     fn globals(&self) -> &GlobalState { &self.globals }
 
     #[inline]
-    fn assignments(&self) -> AssignmentsRef { (&self.assignments).into() }
+    fn assignments(&self) -> AssignmentsRef<'_> { (&self.assignments).into() }
 
     #[inline]
     fn assignments_by_type(&self, t: AssignmentType) -> Option<TypedAssigns<GraphSeal>> {
