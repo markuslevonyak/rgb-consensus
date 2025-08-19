@@ -33,13 +33,29 @@ use single_use_seals::SealWitness;
 use strict_types::TypeSystem;
 
 use super::status::{Failure, Warning};
-use super::{CheckedConsignment, ConsignmentApi, EAnchor, Status, Validity};
+use super::{CheckedConsignment, ConsignmentApi, EAnchor, Status};
 use crate::operation::seal::ExposedSeal;
 use crate::vm::{ContractStateAccess, ContractStateEvolve, OrdOpRef, WitnessOrd};
 use crate::{
     BundleId, ChainNet, ContractId, KnownTransition, OpFullType, OpId, Operation, Opout,
     OutputSeal, SchemaId, TransitionBundle, LIB_NAME_RGB_LOGIC,
 };
+
+/// Error validating a consignment.
+#[derive(Clone, PartialEq, Eq, Debug, Display, Error, From)]
+#[display(doc_comments)]
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(crate = "serde_crate", rename_all = "camelCase")
+)]
+#[allow(clippy::large_enum_variant)]
+pub enum ValidationError {
+    /// detected a failure that makes the consignment invalid
+    InvalidConsignment(Failure),
+    /// a likely temporary error occurred during validation
+    ResolverError(WitnessResolverError),
+}
 
 /// Error resolving witness.
 #[derive(Clone, PartialEq, Eq, Debug, Display, Error, From)]
@@ -52,8 +68,6 @@ use crate::{
 pub enum WitnessResolverError {
     /// actual witness id {actual} doesn't match expected id {expected}.
     IdMismatch { actual: Txid, expected: Txid },
-    /// witness {0} does not exist.
-    Unknown(Txid),
     /// unable to retrieve information from the resolver (TXID: {0:?}), {1}
     ResolverIssue(Option<Txid>, String),
     /// resolver returned invalid data
@@ -143,6 +157,8 @@ impl<R: ResolveWitness> ResolveWitness for CheckedWitnessResolver<R> {
         self.inner.check_chain_net(chain_net)
     }
 }
+
+type InputMap = BTreeMap<OpId, BTreeSet<Outpoint>>;
 
 pub struct Validator<
     'consignment,
@@ -240,7 +256,7 @@ impl<
         safe_height: Option<NonZeroU32>,
         trusted_op_seals: BTreeSet<OpId>,
         trusted_typesystem: TypeSystem,
-    ) -> Status {
+    ) -> Result<Status, ValidationError> {
         let mut validator = Self::init(
             consignment,
             resolver,
@@ -252,83 +268,61 @@ impl<
         // If the chain-network pair doesn't match there is no point in validating the contract
         // since all witness transactions will be missed.
         if validator.chain_net != chain_net {
-            validator
-                .status
-                .borrow_mut()
-                .add_failure(Failure::ContractChainNetMismatch(chain_net));
-            return validator.status.into_inner();
+            return Err(ValidationError::InvalidConsignment(Failure::ContractChainNetMismatch(
+                chain_net,
+            )));
         }
         if resolver.check_chain_net(chain_net).is_err() {
-            validator
-                .status
-                .borrow_mut()
-                .add_failure(Failure::ResolverChainNetMismatch(chain_net));
-            return validator.status.into_inner();
+            return Err(ValidationError::InvalidConsignment(Failure::ResolverChainNetMismatch(
+                chain_net,
+            )));
         }
 
-        validator.validate_schema();
-        // We must return here, since if the schema is not valid there is no reason to
-        // validate contract nodes against it: it will produce a plenty of errors.
-        if validator.status.borrow().validity() == Validity::Invalid {
-            return validator.status.into_inner();
-        }
+        validator.validate_schema()?;
 
-        validator.validate_commitments();
-        // We must return here, since if there were no proper commitments, it is
-        // pointless to validate the contract state.
-        if validator.status.borrow().validity() == Validity::Invalid {
-            return validator.status.into_inner();
-        }
+        validator.validate_commitments()?;
 
-        validator.validate_logic();
-        // Done. Returning status report with all possible failures, issues, warnings
-        // and notifications about transactions we were unable to obtain.
-        validator.status.into_inner()
+        validator.validate_logic()?;
+
+        // Done. Returning status report with all possible warnings and notifications.
+        Ok(validator.status.into_inner())
     }
 
     // *** PART I: Schema validation
-    fn validate_schema(&mut self) {
+    fn validate_schema(&mut self) -> Result<(), ValidationError> {
         for (sem_id, consignment_type) in self.consignment.types().iter() {
             let trusted_type = self.trusted_typesystem.get(*sem_id);
             if trusted_type != Some(consignment_type) {
-                self.status
-                    .borrow_mut()
-                    .add_failure(Failure::TypeSystemMismatch(
-                        *sem_id,
-                        trusted_type.cloned(),
-                        consignment_type.clone(),
-                    ));
-                return;
+                return Err(ValidationError::InvalidConsignment(Failure::TypeSystemMismatch(
+                    *sem_id,
+                    Box::new(trusted_type.cloned()),
+                    Box::new(consignment_type.clone()),
+                )));
             }
         }
-        *self.status.borrow_mut() += self.consignment.schema().verify(self.consignment.types());
+        self.consignment.schema().verify(self.consignment.types())?;
+        Ok(())
     }
 
     // *** PART II: Validating business logic
-    fn validate_logic(&self) {
+    fn validate_logic(&self) -> Result<(), ValidationError> {
         let schema = self.consignment.schema();
 
         // [VALIDATION]: Making sure that we were supplied with the schema
         //               that corresponds to the schema of the contract genesis
         if schema.schema_id() != self.schema_id {
-            self.status
-                .borrow_mut()
-                .add_failure(Failure::SchemaMismatch {
-                    expected: self.schema_id,
-                    actual: schema.schema_id(),
-                });
-            // Unlike other failures, here we return immediately, since there is no point
-            // to validate all consignment data against an invalid schema: it will result in
-            // a plenty of meaningless errors
-            return;
+            return Err(ValidationError::InvalidConsignment(Failure::SchemaMismatch {
+                expected: self.schema_id,
+                actual: schema.schema_id(),
+            }));
         }
 
         // [VALIDATION]: Validate genesis
-        *self.status.borrow_mut() += schema.validate_state(
+        schema.validate_state(
             &self.consignment,
             OrdOpRef::Genesis(self.consignment.genesis()),
             self.contract_state.clone(),
-        );
+        )?;
 
         // [VALIDATION]: Iterating over all consignment operations
         let mut unsafe_history_map: HashMap<u32, HashSet<Txid>> = HashMap::new();
@@ -364,7 +358,7 @@ impl<
                     witness_id,
                     *witness_ord,
                     bundle_id,
-                ));
+                ))?;
             }
         }
         if self.safe_height.is_some() && !unsafe_history_map.is_empty() {
@@ -372,31 +366,30 @@ impl<
                 .borrow_mut()
                 .add_warning(Warning::UnsafeHistory(unsafe_history_map));
         }
+        Ok(())
     }
 
-    fn validate_operation(&self, operation: OrdOpRef<'consignment>) {
+    fn validate_operation(&self, operation: OrdOpRef<'consignment>) -> Result<(), ValidationError> {
         let schema = self.consignment.schema();
         let opid = operation.id();
         if self.trusted_op_seals.contains(&opid) {
-            return;
+            return Ok(());
         }
 
         if operation.contract_id() != self.contract_id {
-            self.status
-                .borrow_mut()
-                .add_failure(Failure::ContractMismatch(opid, operation.contract_id()));
+            return Err(ValidationError::InvalidConsignment(Failure::ContractMismatch(
+                opid,
+                operation.contract_id(),
+            )));
         }
 
         if !self.validated_opids.borrow().contains(&opid)
             && matches!(operation.full_type(), OpFullType::StateTransition(_))
         {
-            self.status
-                .borrow_mut()
-                .add_failure(Failure::SealsUnvalidated(opid));
+            return Err(ValidationError::InvalidConsignment(Failure::SealsUnvalidated(opid)));
         }
         // [VALIDATION]: Verify operation against the schema and scripts
-        *self.status.borrow_mut() +=
-            schema.validate_state(&self.consignment, operation, self.contract_state.clone());
+        schema.validate_state(&self.consignment, operation, self.contract_state.clone())?;
 
         match operation {
             OrdOpRef::Genesis(_) => {
@@ -405,44 +398,43 @@ impl<
             OrdOpRef::Transition(transition, ..) => {
                 for input in &transition.inputs {
                     if self.consignment.operation(input.op).is_none() {
-                        self.status
-                            .borrow_mut()
-                            .add_failure(Failure::OperationAbsent(input.op));
+                        return Err(ValidationError::InvalidConsignment(Failure::OperationAbsent(
+                            input.op,
+                        )));
                     }
                 }
             }
         }
+        Ok(())
     }
 
     // *** PART III: Validating single-use-seals
-    fn validate_commitments(&mut self) {
+    fn validate_commitments(&mut self) -> Result<(), ValidationError> {
         for bundle in self.consignment.bundles() {
             let bundle_id = bundle.bundle_id();
             let Some((witness_id, anchor)) = self.consignment.anchor(bundle_id) else {
-                self.status
-                    .borrow_mut()
-                    .add_failure(Failure::AnchorAbsent(bundle_id));
-                continue;
+                return Err(ValidationError::InvalidConsignment(Failure::AnchorAbsent(bundle_id)));
             };
             if bundle.check_opid_commitments().is_err() {
-                self.status
-                    .borrow_mut()
-                    .add_failure(Failure::ExtraKnownTransition(bundle.bundle_id()));
+                return Err(ValidationError::InvalidConsignment(Failure::ExtraKnownTransition(
+                    bundle.bundle_id(),
+                )));
             }
 
             // [VALIDATION]: We validate that the seals were properly defined on BP-type layer
-            let (seals, input_map) = self.validate_seal_definitions(&bundle);
+            let (seals, input_map) = self.validate_seal_definitions(&bundle)?;
 
             // [VALIDATION]: We validate that the seals were properly closed on BP-type layer
             let Some(witness_tx) =
-                self.validate_seal_commitments(&seals, bundle_id, witness_id, anchor)
+                self.validate_seal_commitments(&seals, bundle_id, witness_id, anchor)?
             else {
                 continue;
             };
 
             // [VALIDATION]: We validate bundle commitments to the input map
-            self.validate_bundle_commitments(bundle_id, &bundle, witness_tx, input_map);
+            self.validate_bundle_commitments(bundle_id, &bundle, witness_tx, input_map)?;
         }
+        Ok(())
     }
 
     /// Validates that the transition bundle is internally consistent: inputs of
@@ -455,7 +447,7 @@ impl<
         bundle: &TransitionBundle,
         pub_witness: Tx,
         input_map: BTreeMap<OpId, BTreeSet<Outpoint>>,
-    ) {
+    ) -> Result<(), ValidationError> {
         let witness_id = pub_witness.txid();
         let witness_inputs = BTreeSet::from_iter(pub_witness.inputs.iter().map(|i| i.prev_output));
 
@@ -465,13 +457,13 @@ impl<
             }
             if let Some(outpoints) = input_map.get(opid) {
                 if !outpoints.is_subset(&witness_inputs) {
-                    self.status
-                        .borrow_mut()
-                        .add_failure(Failure::WitnessMissingInput(bundle_id, *opid, witness_id));
-                    continue;
+                    return Err(ValidationError::InvalidConsignment(Failure::WitnessMissingInput(
+                        bundle_id, *opid, witness_id,
+                    )));
                 }
             }
         }
+        Ok(())
     }
 
     /// Bitcoin- and liquid-specific commitment validation using deterministic
@@ -482,45 +474,33 @@ impl<
         bundle_id: BundleId,
         witness_id: Txid,
         anchor: &EAnchor,
-    ) -> Option<Tx> {
+    ) -> Result<Option<Tx>, ValidationError> {
         // Check that the anchor is committed into a transaction spending all the
         // transition inputs.
         // Here the method can do SPV proof instead of querying the indexer. The SPV
         // proofs can be part of the consignments, but do not require .
         match self.resolver.resolve_witness(witness_id) {
             Err(err) => {
-                // We wre unable to retrieve corresponding transaction, so can't check.
-                // Reporting this incident and continuing further. Why this happens? No
-                // connection to Bitcoin Core, Electrum or other backend etc. So this is not a
-                // failure in a strict sense, however we can't be sure that the consignment is
-                // valid.
-                // This also can mean that there is no known transaction with the id provided by
-                // the anchor, i.e. consignment is invalid. We are proceeding with further
-                // validation in order to detect the rest of problems (and reporting the
-                // failure!)
-                self.status
-                    .borrow_mut()
-                    .add_failure(Failure::SealNoPubWitness(bundle_id, witness_id, err));
-                None
+                // Unable to retrieve the corresponding transaction from the resolver.
+                // Reporting this incident immediately.
+                Err(ValidationError::ResolverError(err))
             }
             Ok(witness_status) => match witness_status {
                 WitnessStatus::Resolved(tx, ord) if ord != WitnessOrd::Archived => {
                     let seals = seals.as_ref();
                     let witness = Witness::with(tx.clone(), anchor.dbc_proof.clone());
                     self.tx_ord_map.borrow_mut().insert(witness.txid, ord);
-                    self.validate_seal_closing(seals, bundle_id, witness, anchor.mpc_proof.clone());
-                    Some(tx)
+                    self.validate_seal_closing(
+                        seals,
+                        bundle_id,
+                        witness,
+                        anchor.mpc_proof.clone(),
+                    )?;
+                    Ok(Some(tx))
                 }
-                _ => {
-                    self.status
-                        .borrow_mut()
-                        .add_failure(Failure::SealNoPubWitness(
-                            bundle_id,
-                            witness_id,
-                            WitnessResolverError::Unknown(witness_id),
-                        ));
-                    None
-                }
+                _ => Err(ValidationError::InvalidConsignment(Failure::SealNoPubWitness(
+                    bundle_id, witness_id,
+                ))),
             },
         }
     }
@@ -531,24 +511,23 @@ impl<
     fn validate_seal_definitions(
         &self,
         bundle: &TransitionBundle,
-    ) -> (Vec<OutputSeal>, BTreeMap<OpId, BTreeSet<Outpoint>>) {
+    ) -> Result<(Vec<OutputSeal>, InputMap), ValidationError> {
         let mut input_map: BTreeMap<OpId, BTreeSet<Outpoint>> = bmap!();
         let mut seals = vec![];
         for KnownTransition { opid, transition } in &bundle.known_transitions {
             let opid = *opid;
             if opid != transition.id() {
-                self.status
-                    .borrow_mut()
-                    .add_failure(Failure::TransitionIdMismatch(opid, transition.id()));
+                return Err(ValidationError::InvalidConsignment(Failure::TransitionIdMismatch(
+                    opid,
+                    transition.id(),
+                )));
             }
             if self.trusted_op_seals.contains(&opid) {
                 continue;
             }
 
             if !self.validated_opids.borrow_mut().insert(opid) {
-                self.status
-                    .borrow_mut()
-                    .add_failure(Failure::CyclicGraph(opid));
+                return Err(ValidationError::InvalidConsignment(Failure::CyclicGraph(opid)));
             }
 
             // Checking that witness transaction closes seals defined by transition previous
@@ -556,64 +535,55 @@ impl<
             for input in &transition.inputs {
                 let Opout { op, ty, no } = input;
                 if !self.input_assignments.borrow_mut().insert(input) {
-                    self.status
-                        .borrow_mut()
-                        .add_failure(Failure::DoubleSpend(input));
+                    return Err(ValidationError::InvalidConsignment(Failure::DoubleSpend(input)));
                 }
                 if bundle.input_map.get(&input).map_or(true, |v| *v != opid) {
-                    self.status
-                        .borrow_mut()
-                        .add_failure(Failure::MissingInputMapTransition(bundle.bundle_id(), op));
+                    return Err(ValidationError::InvalidConsignment(
+                        Failure::MissingInputMapTransition(bundle.bundle_id(), op),
+                    ));
                 }
 
                 let Some(prev_op) = self.consignment.operation(op) else {
                     // Node, referenced as the ancestor, was not found in the consignment.
                     // Usually this means that the consignment data are broken
-                    self.status
-                        .borrow_mut()
-                        .add_failure(Failure::OperationAbsent(op));
-                    continue;
+                    return Err(ValidationError::InvalidConsignment(Failure::OperationAbsent(op)));
                 };
 
                 if !self.validated_opids.borrow().contains(&op)
                     && prev_op.full_type().is_transition()
                     && !self.trusted_op_seals.contains(&op)
                 {
-                    self.status
-                        .borrow_mut()
-                        .add_failure(Failure::UnorderedTransition(op));
+                    return Err(ValidationError::InvalidConsignment(Failure::UnorderedTransition(
+                        op,
+                    )));
                 }
 
                 let Some(variant) = prev_op.assignments_by_type(ty) else {
-                    self.status.borrow_mut().add_failure(Failure::NoPrevState {
+                    return Err(ValidationError::InvalidConsignment(Failure::NoPrevState {
                         opid,
                         prev_id: op,
                         state_type: ty,
-                    });
-                    continue;
+                    }));
                 };
 
                 let Ok(seal) = variant.revealed_seal_at(no) else {
-                    self.status
-                        .borrow_mut()
-                        .add_failure(Failure::NoPrevOut(opid, input));
-                    continue;
+                    return Err(ValidationError::InvalidConsignment(Failure::NoPrevOut(
+                        opid, input,
+                    )));
                 };
                 let Some(seal) = seal else {
                     // Everything is ok, but we have incomplete data (confidential), thus can't do a
                     // full verification and have to report the failure
-                    self.status
-                        .borrow_mut()
-                        .add_failure(Failure::ConfidentialSeal(input));
-                    continue;
+                    return Err(ValidationError::InvalidConsignment(Failure::ConfidentialSeal(
+                        input,
+                    )));
                 };
 
                 let seal = if matches!(prev_op.full_type(), OpFullType::StateTransition(_)) {
                     let Some(witness_id) = self.consignment.op_witness_id(op) else {
-                        self.status
-                            .borrow_mut()
-                            .add_failure(Failure::OperationAbsent(op));
-                        continue;
+                        return Err(ValidationError::InvalidConsignment(Failure::OperationAbsent(
+                            op,
+                        )));
                     };
                     seal.to_output_seal_or_default(witness_id)
                 } else {
@@ -629,7 +599,7 @@ impl<
                 self.status.borrow_mut().input_opouts.insert(input);
             }
         }
-        (seals, input_map)
+        Ok((seals, input_map))
     }
 
     /// Single-use-seal closing validation.
@@ -648,7 +618,8 @@ impl<
         bundle_id: BundleId,
         witness: Witness<Dbc>,
         mpc_proof: mpc::MerkleProof,
-    ) where
+    ) -> Result<(), ValidationError>
+    where
         Witness<Dbc>: SealWitness<Seal, Message = mpc::Commitment>,
     {
         let message = mpc::Message::from(bundle_id);
@@ -659,9 +630,11 @@ impl<
             Err(err) => {
                 // The operation is not committed to bitcoin transaction graph!
                 // Ultimate failure. But continuing to detect the rest (after reporting it).
-                self.status
-                    .borrow_mut()
-                    .add_failure(Failure::MpcInvalid(bundle_id, witness_id, err));
+                return Err(ValidationError::InvalidConsignment(Failure::MpcInvalid(
+                    bundle_id,
+                    witness_id,
+                    Box::new(err),
+                )));
             }
             Ok(commitment) => {
                 // [VALIDATION]: Verify commitment
@@ -670,10 +643,9 @@ impl<
                     .outputs()
                     .find(|out| out.script_pubkey.is_op_return() || out.script_pubkey.is_p2tr())
                 else {
-                    self.status
-                        .borrow_mut()
-                        .add_failure(Failure::NoDbcOutput(witness_id));
-                    return;
+                    return Err(ValidationError::InvalidConsignment(Failure::NoDbcOutput(
+                        witness_id,
+                    )));
                 };
                 let output_method = if output.script_pubkey.is_op_return() {
                     CloseMethod::OpretFirst
@@ -682,22 +654,23 @@ impl<
                 };
                 let proof_method = witness.proof.method();
                 if proof_method != output_method {
-                    self.status
-                        .borrow_mut()
-                        .add_failure(Failure::InvalidProofType(witness_id, proof_method));
+                    return Err(ValidationError::InvalidConsignment(Failure::InvalidProofType(
+                        witness_id,
+                        proof_method,
+                    )));
                 }
                 // [VALIDATION]: CHECKING SINGLE-USE-SEALS
                 witness
                     .verify_many_seals(seals, &commitment)
                     .map_err(|err| {
-                        self.status.borrow_mut().add_failure(Failure::SealsInvalid(
+                        ValidationError::InvalidConsignment(Failure::SealsInvalid(
                             bundle_id,
                             witness_id,
                             err.to_string(),
-                        ));
-                    })
-                    .ok();
+                        ))
+                    })?;
             }
         }
+        Ok(())
     }
 }

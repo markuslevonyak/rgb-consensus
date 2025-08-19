@@ -32,7 +32,6 @@ use commit_verify::mpc::InvalidProof;
 use strict_types::{SemId, Ty};
 
 use crate::schema::{self, SchemaId};
-use crate::validation::WitnessResolverError;
 use crate::{
     BundleId, ChainNet, ContractId, OccurrencesMismatch, OpFullType, OpId, Opout,
     SealClosingStrategy, StateType,
@@ -48,9 +47,6 @@ pub enum Validity {
 
     #[display("valid, with warnings")]
     Warnings,
-
-    #[display("is NOT valid")]
-    Invalid,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
@@ -60,7 +56,6 @@ pub enum Validity {
     serde(crate = "serde_crate", rename_all = "camelCase")
 )]
 pub struct Status {
-    pub failures: Vec<Failure>,
     pub warnings: Vec<Warning>,
     pub info: Vec<Info>,
     pub input_opouts: BTreeSet<Opout>,
@@ -70,13 +65,6 @@ impl Display for Status {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         if f.alternate() {
             writeln!(f, "Consignment {}", self.validity())?;
-        }
-
-        if !self.failures.is_empty() {
-            f.write_str("Validation failures:\n")?;
-            for fail in &self.failures {
-                writeln!(f, "- {fail}")?;
-            }
         }
 
         if !self.warnings.is_empty() {
@@ -99,46 +87,13 @@ impl Display for Status {
 
 impl AddAssign for Status {
     fn add_assign(&mut self, rhs: Self) {
-        self.failures.extend(rhs.failures);
         self.warnings.extend(rhs.warnings);
         self.info.extend(rhs.info);
     }
 }
 
 impl Status {
-    pub fn from_error(v: Failure) -> Self {
-        Status {
-            failures: vec![v],
-            warnings: vec![],
-            info: vec![],
-            input_opouts: bset![],
-        }
-    }
-}
-
-impl FromIterator<Failure> for Status {
-    fn from_iter<T: IntoIterator<Item = Failure>>(iter: T) -> Self {
-        Self {
-            failures: iter.into_iter().collect(),
-            ..Self::default()
-        }
-    }
-}
-
-impl Status {
     pub fn new() -> Self { Self::default() }
-
-    pub fn with_failure(failure: impl Into<Failure>) -> Self {
-        Self {
-            failures: vec![failure.into()],
-            ..Self::default()
-        }
-    }
-
-    pub fn add_failure(&mut self, failure: impl Into<Failure>) -> &Self {
-        self.failures.push(failure.into());
-        self
-    }
 
     pub fn add_warning(&mut self, warning: impl Into<Warning>) -> &Self {
         self.warnings.push(warning.into());
@@ -151,9 +106,7 @@ impl Status {
     }
 
     pub fn validity(&self) -> Validity {
-        if !self.failures.is_empty() {
-            Validity::Invalid
-        } else if !self.warnings.is_empty() {
+        if !self.warnings.is_empty() {
             Validity::Warnings
         } else {
             Validity::Valid
@@ -188,7 +141,7 @@ pub enum Failure {
     },
 
     /// type with sem_id {0} does not match the trusted one {1:?} (found {2})
-    TypeSystemMismatch(SemId, Option<Ty<SemId>>, Ty<SemId>),
+    TypeSystemMismatch(SemId, Box<Option<Ty<SemId>>>, Box<Ty<SemId>>),
     /// schema global state #{0} uses semantic data type absent in type library
     /// ({1}).
     SchemaGlobalSemIdUnknown(schema::GlobalStateType, SemId),
@@ -235,7 +188,7 @@ pub enum Failure {
     /// invalid owned state value in operation {0}, state type #{1} which does
     /// not match semantic type id {2}.
     SchemaInvalidOwnedValue(OpId, schema::AssignmentType, SemId),
-    /// invalid number of input entries of type {1} in operation {0} - {2}  
+    /// invalid number of input entries of type {1} in operation {0} - {2}
     SchemaInputOccurrences(OpId, schema::AssignmentType, OccurrencesMismatch),
     /// invalid number of assignment entries of type {1} in operation {0} - {2}
     SchemaAssignmentOccurrences(OpId, schema::AssignmentType, OccurrencesMismatch),
@@ -282,9 +235,8 @@ pub enum Failure {
     /// seal defined in the history as a part of operation output {0} is
     /// confidential and can't be validated.
     ConfidentialSeal(Opout),
-    /// bundle {0} public witness {1} is not known to the resolver. Resolver
-    /// reported error {2}
-    SealNoPubWitness(BundleId, Txid, WitnessResolverError),
+    /// bundle {0} public witness {1} is not known to the resolver.
+    SealNoPubWitness(BundleId, Txid),
     /// transition bundle {0} doesn't close seal with the witness {1}. Details:
     /// {2}
     SealsInvalid(BundleId, Txid, String),
@@ -293,7 +245,7 @@ pub enum Failure {
     SealsUnvalidated(OpId),
     /// transition bundle {0} is not properly anchored to the witness {1}.
     /// Details: {2}
-    MpcInvalid(BundleId, Txid, InvalidProof),
+    MpcInvalid(BundleId, Txid, Box<InvalidProof>),
     /// witness transaction {0} has no taproot or OP_RETURN output.
     NoDbcOutput(Txid),
     /// first DBC-compatible output of witness transaction {0} doesn't match the provided proof
