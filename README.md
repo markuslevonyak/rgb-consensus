@@ -1,8 +1,7 @@
 # RGB Consensus
 
-![Build](https://github.com/rgb-protocol/rgb-consensus/workflows/Build/badge.svg)
-![Tests](https://github.com/rgb-protocol/rgb-consensus/workflows/Tests/badge.svg)
-![Lints](https://github.com/rgb-protocol/rgb-consensus/workflows/Lints/badge.svg)
+[![Build](https://github.com/rgb-protocol/rgb-consensus/workflows/Build/badge.svg)](https://github.com/rgb-protocol/rgb-consensus/actions/workflows/build.yml)
+[![Tests](https://github.com/rgb-protocol/rgb-consensus/workflows/Tests/badge.svg)](https://github.com/rgb-protocol/rgb-consensus/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/rgb-protocol/rgb-consensus/branch/master/graph/badge.svg)](https://codecov.io/gh/rgb-protocol/rgb-consensus)
 
 [![crates.io](https://img.shields.io/crates/v/rgb-consensus)](https://crates.io/crates/rgb-consensus)
