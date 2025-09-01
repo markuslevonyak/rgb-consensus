@@ -1,7 +1,8 @@
 # RGB Consensus
 
-[![Build](https://github.com/rgb-protocol/rgb-consensus/workflows/Build/badge.svg)](https://github.com/rgb-protocol/rgb-consensus/actions/workflows/build.yml)
-[![Tests](https://github.com/rgb-protocol/rgb-consensus/workflows/Tests/badge.svg)](https://github.com/rgb-protocol/rgb-consensus/actions/workflows/test.yml)
+[![Build](https://github.com/rgb-protocol/rgb-consensus/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/rgb-protocol/rgb-consensus/actions/workflows/build.yml)
+[![Tests](https://github.com/rgb-protocol/rgb-consensus/actions/workflows/test.yml/badge.svg?branch=master)](https://github.com/rgb-protocol/rgb-consensus/actions/workflows/test.yml)
+[![Lints](https://github.com/rgb-protocol/rgb-consensus/actions/workflows/lint.yml/badge.svg?branch=master)](https://github.com/rgb-protocol/rgb-consensus/actions/workflows/lint.yml)
 [![codecov](https://codecov.io/gh/rgb-protocol/rgb-consensus/branch/master/graph/badge.svg)](https://codecov.io/gh/rgb-protocol/rgb-consensus)
 
 [![crates.io](https://img.shields.io/crates/v/rgb-consensus)](https://crates.io/crates/rgb-consensus)
