@@ -30,7 +30,7 @@ The consensus-critical code library is shared with the following libraries:
 
 ## License
 
-See [LICENCE](LICENSE) file.
+See [LICENSE](LICENSE) file.
 
 
 [Site]: https://rgb.info
