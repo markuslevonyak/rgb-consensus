@@ -28,13 +28,13 @@ use aluvm::library::LibId;
 use amplify::confinement::TinyOrdMap;
 use amplify::{ByteArray, Bytes32};
 use baid64::{Baid64ParseError, DisplayBaid64, FromBaid64Str};
-use commit_verify::{CommitEncode, CommitEngine, CommitId, CommitmentId, DigestExt, Sha256};
 use strict_encoding::{
     StrictDecode, StrictDeserialize, StrictEncode, StrictSerialize, StrictType, TypeName,
 };
 use strict_types::{FieldName, SemId};
 
 use super::{AssignmentType, GenesisSchema, OwnedStateSchema, TransitionSchema};
+use crate::commit_verify::{CommitEncode, CommitEngine, CommitId, CommitmentId, DigestExt, Sha256};
 use crate::{impl_serde_baid64, Ffv, GlobalStateSchema, StateType, LIB_NAME_RGB_COMMIT};
 
 #[derive(Wrapper, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, From, Display)]

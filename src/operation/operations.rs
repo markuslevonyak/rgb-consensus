@@ -28,10 +28,14 @@ use std::str::FromStr;
 
 use amplify::confinement::{Confined, NonEmptyOrdSet, TinyOrdSet, U16};
 use amplify::{hex, Bytes64, Wrapper};
-use commit_verify::{CommitEncode, CommitEngine, CommitId, MerkleHash, MerkleLeaves, StrictHash};
 use strict_encoding::stl::AsciiPrintable;
-use strict_encoding::{RString, StrictDeserialize, StrictEncode, StrictSerialize};
+use strict_encoding::{
+    DefaultBasedStrictDumb, RString, StrictDeserialize, StrictEncode, StrictSerialize,
+};
 
+use crate::commit_verify::{
+    CommitEncode, CommitEngine, CommitId, MerkleHash, MerkleLeaves, StrictHash,
+};
 use crate::schema::{OpFullType, SchemaId, TransitionType};
 use crate::{
     Assign, AssignmentIndex, AssignmentType, Assignments, AssignmentsRef, ChainNet, ContractId,
@@ -42,8 +46,6 @@ use crate::{
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, Display)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_RGB_COMMIT)]
-#[derive(CommitEncode)]
-#[commit_encode(strategy = strict, id = MerkleHash)]
 #[display("{op}/{ty}/{no}")]
 /// RGB contract operation output pointer, defined by the operation ID and
 /// output number.
@@ -51,6 +53,12 @@ pub struct Opout {
     pub op: OpId,
     pub ty: AssignmentType,
     pub no: u16,
+}
+
+impl CommitEncode for Opout {
+    type CommitmentId = MerkleHash;
+
+    fn commit_encode(&self, e: &mut CommitEngine) { e.commit_to_serialized(&self); }
 }
 
 impl Opout {
@@ -169,9 +177,9 @@ impl MerkleLeaves for Inputs {
 
 /// RGB contract operation API, defined as trait
 ///
-/// Implemented by all contract operation types (see [`OpType`]):
+/// Implemented by all contract operation types (see [`OpFullType`]):
 /// - Genesis ([`Genesis`])
-/// - State transitions ([`Transitions`])
+/// - State transitions ([`Transition`])
 pub trait Operation {
     /// Returns full contract operation type information
     fn full_type(&self) -> OpFullType;
@@ -258,14 +266,20 @@ pub trait Operation {
 #[display(inner)]
 #[derive(StrictType, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_RGB_COMMIT)]
-#[derive(CommitEncode)]
-#[commit_encode(strategy = strict, id = StrictHash)]
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
     serde(crate = "serde_crate", transparent)
 )]
 pub struct Identity(RString<AsciiPrintable, AsciiPrintable, 1, 4096>);
+
+impl CommitEncode for Identity {
+    type CommitmentId = StrictHash;
+
+    fn commit_encode(&self, e: &mut CommitEngine) { e.commit_to_serialized(&self); }
+}
+
+impl DefaultBasedStrictDumb for Identity {}
 
 impl Default for Identity {
     fn default() -> Self { Self::from("ssi:anonymous") }
@@ -291,6 +305,8 @@ pub enum SealClosingStrategy {
     #[default]
     FirstOpretOrTapret = 0,
 }
+
+impl DefaultBasedStrictDumb for SealClosingStrategy {}
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]

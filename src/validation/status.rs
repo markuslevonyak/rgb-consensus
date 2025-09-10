@@ -26,12 +26,12 @@ use std::fmt::{self, Display, Formatter};
 
 use aluvm::library::LibId;
 use amplify::num::u24;
-use bp::seals::txout::CloseMethod;
-use bp::{Outpoint, Txid};
-use commit_verify::mpc::InvalidProof;
+use bitcoin::{OutPoint, Txid};
 use strict_types::{SemId, Ty};
 
+use crate::commit_verify::mpc::InvalidProof;
 use crate::schema::{self, SchemaId};
+use crate::seals::txout::CloseMethod;
 use crate::validation::OpoutsDagData;
 use crate::vm::WitnessOrd;
 use crate::{
@@ -207,7 +207,7 @@ pub enum Failure {
 
     // Errors checking bundle commitments
     /// transition bundle {0} references non-existing input {1} in witness {2}.
-    WitnessMissingInput(BundleId, Outpoint, Txid),
+    WitnessMissingInput(BundleId, OutPoint, Txid),
     /// transition bundle {0} input map does not include operation {1} as the one
     /// spending opout {1}.
     InputMapTransitionMismatch(BundleId, OpId, Opout),

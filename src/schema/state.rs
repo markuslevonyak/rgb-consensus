@@ -21,7 +21,7 @@
 // limitations under the License.
 
 use amplify::num::u24;
-use strict_encoding::Primitive;
+use strict_encoding::{DefaultBasedStrictDumb, Primitive};
 use strict_types::SemId;
 
 use crate::{StateType, LIB_NAME_RGB_COMMIT};
@@ -73,6 +73,8 @@ pub enum FungibleType {
     #[display("64bit")]
     Unsigned64Bit = Primitive::U64.into_code(),
 }
+
+impl DefaultBasedStrictDumb for FungibleType {}
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]

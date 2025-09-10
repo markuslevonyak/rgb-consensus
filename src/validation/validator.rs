@@ -26,22 +26,23 @@ use std::num::NonZeroU32;
 use std::rc::Rc;
 
 use amplify::confinement::{Collection, ConfinedOrdMap};
-use bp::dbc::Anchor;
-use bp::seals::txout::{BlindSeal, CloseMethod, Witness};
-use bp::{dbc, Tx, Txid};
-use commit_verify::mpc;
+use bitcoin::{Transaction as Tx, Txid};
 use single_use_seals::SealWitness;
-use strict_types::{StrictDumb, TypeSystem};
+use strict_types::TypeSystem;
 
 use super::status::{Failure, Warning};
 use super::{CheckedConsignment, ConsignmentApi, DbcProof, Status};
 use crate::assignments::RevealedAssign;
+use crate::commit_verify::mpc;
+use crate::dbc::{self, Anchor};
 use crate::operation::seal::ExposedSeal;
+use crate::seals::txout::{CloseMethod, Witness};
+use crate::txout::BlindSeal;
 use crate::validation::{OpoutsDagInfo, Scripts};
 use crate::vm::{ContractStateAccess, ContractStateEvolve, OrdOpRef, WitnessOrd};
 use crate::{
     AssignmentType, Assignments, BundleId, ChainNet, ContractId, KnownTransition, OpId, Operation,
-    Opout, RevealedState, SchemaId, TransitionBundle, LIB_NAME_RGB_LOGIC,
+    Opout, RevealedState, SchemaId, TransitionBundle,
 };
 
 /// Error validating a consignment.
@@ -96,9 +97,7 @@ pub trait ResolveWitness {
 
 /// Resolve status of a witness TX.
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Display, From)]
-#[display(lowercase)]
-#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_RGB_LOGIC, tags = order)]
+#[display(doc_comments)]
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
@@ -106,7 +105,6 @@ pub trait ResolveWitness {
 )]
 pub enum WitnessStatus {
     /// TX has not been found.
-    #[strict_type(dumb)]
     Unresolved,
     /// TX has been found.
     Resolved(Tx, WitnessOrd),
@@ -145,7 +143,7 @@ impl<R: ResolveWitness> ResolveWitness for CheckedWitnessResolver<R> {
     fn resolve_witness(&self, witness_id: Txid) -> Result<WitnessStatus, WitnessResolverError> {
         let witness_status = self.inner.resolve_witness(witness_id)?;
         if let WitnessStatus::Resolved(tx, _ord) = &witness_status {
-            let actual_id = tx.txid();
+            let actual_id = tx.compute_txid();
             if actual_id != witness_id {
                 return Err(WitnessResolverError::IdMismatch {
                     actual: actual_id,
@@ -418,7 +416,10 @@ impl<
             }
             Ok(witness_status) => match witness_status {
                 WitnessStatus::Resolved(tx, ord) if ord != WitnessOrd::Archived => {
-                    self.status.borrow_mut().tx_ord_map.insert(tx.txid(), ord);
+                    self.status
+                        .borrow_mut()
+                        .tx_ord_map
+                        .insert(tx.compute_txid(), ord);
                     Ok((tx, ord))
                 }
                 _ => Err(ValidationError::InvalidConsignment(Failure::SealNoPubWitness(
@@ -463,10 +464,10 @@ impl<
             }
             Ok(commitment) => {
                 // [VALIDATION]: Verify commitment
-                let Some(output) = witness
-                    .tx
-                    .outputs()
-                    .find(|out| out.script_pubkey.is_op_return() || out.script_pubkey.is_p2tr())
+                let Some(output) =
+                    witness.tx.output.iter().find(|out| {
+                        out.script_pubkey.is_op_return() || out.script_pubkey.is_p2tr()
+                    })
                 else {
                     return Err(ValidationError::InvalidConsignment(Failure::NoDbcOutput(
                         witness.txid,

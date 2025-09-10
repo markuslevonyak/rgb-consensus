@@ -35,7 +35,7 @@ mod commit;
 pub use assignments::{
     Assign, AssignData, AssignFungible, AssignRights, Assignments, AssignmentsRef, TypedAssigns,
 };
-pub use bundle::{BundleId, KnownTransition, TransitionBundle, UnrelatedTransition, Vin};
+pub use bundle::{BundleId, KnownTransition, TransitionBundle, UnrelatedTransition, Vin, Vout};
 pub use commit::{
     AssignmentCommitment, AssignmentIndex, BaseCommitment, BundleDisclosure, ContractId,
     DiscloseHash, GlobalCommitment, OpCommitment, OpDisclose, OpId, TypeCommitment,
@@ -49,5 +49,5 @@ pub use operations::{
     Genesis, Identity, Inputs, Operation, Opout, OpoutParseError, SealClosingStrategy, Signature,
     Transition,
 };
-pub use seal::{ExposedSeal, GenesisSeal, GraphSeal, OutputSeal, SecretSeal, TxoSeal};
+pub use seal::{ExposedSeal, GenesisSeal, GraphSeal, OutputSeal, TxoSeal};
 pub use state::{ExposedState, RevealedState, StateType};

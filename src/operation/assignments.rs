@@ -26,13 +26,13 @@ use std::collections::{btree_map, BTreeSet};
 use std::hash::Hash;
 
 use amplify::confinement::{Confined, NonEmptyVec, SmallOrdMap, U16};
-use bp::seals::txout::BlindSeal;
-use bp::Txid;
-use commit_verify::Conceal;
-use strict_encoding::{StrictDecode, StrictDumb, StrictEncode};
+use bitcoin::Txid;
+use strict_encoding::{DefaultBasedStrictDumb, StrictDecode, StrictDumb, StrictEncode};
 
 use super::ExposedState;
+use crate::commit_verify::Conceal;
 use crate::operation::seal::GenesisSeal;
+use crate::txout::BlindSeal;
 use crate::{
     AssignmentType, ExposedSeal, GraphSeal, RevealedData, RevealedState, RevealedValue, SecretSeal,
     StateType, VoidState, LIB_NAME_RGB_COMMIT,
@@ -344,7 +344,7 @@ impl<Seal: ExposedSeal> TypedAssigns<Seal> {
 
     /// If seal definition does not exist, returns [`UnknownDataError`]. If the
     /// seal is confidential, returns `Ok(None)`; otherwise returns revealed
-    /// seal data packed as `Ok(Some(`[`Seal`]`))`
+    /// seal data packed as `Ok(Some(`[`impl Seal`]`))`
     pub fn revealed_seal_at(&self, index: u16) -> Result<Option<Seal>, UnknownDataError> {
         Ok(match self {
             TypedAssigns::Declarative(vec) => vec
@@ -516,6 +516,8 @@ impl TypedAssigns<GenesisSeal> {
 )]
 pub struct Assignments<Seal>(SmallOrdMap<AssignmentType, TypedAssigns<Seal>>)
 where Seal: ExposedSeal;
+
+impl<Seal: ExposedSeal> DefaultBasedStrictDumb for Assignments<Seal> {}
 
 impl<Seal: ExposedSeal> Default for Assignments<Seal> {
     fn default() -> Self { Self(empty!()) }

@@ -23,6 +23,7 @@
 use aluvm::library::LibSite;
 use amplify::confinement::{TinyOrdMap, TinyOrdSet};
 use amplify::Wrapper;
+use strict_encoding::DefaultBasedStrictDumb;
 
 use super::{GlobalStateType, Occurrences, TransitionType};
 use crate::schema::schema::MetaType;
@@ -112,6 +113,8 @@ pub struct GenesisSchema {
     pub validator: Option<LibSite>,
 }
 
+impl DefaultBasedStrictDumb for GenesisSchema {}
+
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
 #[derive(StrictType, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_RGB_COMMIT)]
@@ -127,6 +130,8 @@ pub struct TransitionSchema {
     pub assignments: AssignmentsSchema,
     pub validator: Option<LibSite>,
 }
+
+impl DefaultBasedStrictDumb for TransitionSchema {}
 
 impl OpSchema for GenesisSchema {
     #[inline]

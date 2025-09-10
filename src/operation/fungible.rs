@@ -35,7 +35,7 @@ use core::num::ParseIntError;
 use core::str::FromStr;
 use std::hash::Hash;
 
-use strict_encoding::{StrictDecode, StrictDumb, StrictEncode};
+use strict_encoding::{DefaultBasedStrictDumb, StrictDecode, StrictDumb, StrictEncode};
 
 use super::ExposedState;
 use crate::{schema, RevealedState, StateType, LIB_NAME_RGB_COMMIT};
@@ -57,6 +57,8 @@ pub enum FungibleState {
     Bits64(u64),
     // When/if adding more variants do not forget to re-write FromStr impl
 }
+
+impl DefaultBasedStrictDumb for FungibleState {}
 
 impl Default for FungibleState {
     fn default() -> Self { FungibleState::Bits64(0) }

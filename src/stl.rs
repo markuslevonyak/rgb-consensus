@@ -21,75 +21,117 @@
 // limitations under the License.
 
 pub use aluvm::stl::aluvm_stl;
-pub use bp::bc::stl::{bp_consensus_stl, bp_tx_stl};
-pub use bp::stl::bp_core_stl;
-use bp::Txid;
-use commit_verify::stl::commit_verify_stl;
-use strict_types::stl::{std_stl, strict_types_stl};
+use bitcoin::Txid;
+use strict_types::stl::{bitcoin_stl, bitcoin_tx_stl, std_stl, strict_types_stl};
 use strict_types::typelib::LibBuilder;
-use strict_types::{CompileError, TypeLib};
+use strict_types::TypeLib;
 
+use crate::commit_verify::{mpc, MerkleHash, MerkleNode, StrictHash, LIB_NAME_COMMIT_VERIFY};
+use crate::dbc::{self, LIB_NAME_BPCORE};
+use crate::txout::{self, TxPtr};
 use crate::validation::DbcProof;
 use crate::vm::GlobalOrd;
 use crate::{
-    BundleId, Genesis, OpCommitment, Schema, TransitionBundle, LIB_NAME_RGB_COMMIT,
+    seals, BundleId, Genesis, OpCommitment, Schema, TransitionBundle, LIB_NAME_RGB_COMMIT,
     LIB_NAME_RGB_LOGIC,
 };
 
+pub const LIB_ID_COMMIT_VERIFY: &str =
+    "stl:G28pSECj-k8LSNgX-194cjdl-MJhnIBd-P8PDPq2-mUsF6Nc#sigma-mozart-round";
+/// Strict types id for the library providing data types from [`dbc`] and
+/// [`seals`] crates.
+pub const LIB_ID_BPCORE: &str =
+    "stl:o_y9NPCe-nv_Oiad-q5U7Yru-ZLYFBP6-crZnI5h-MShzq9g#comet-betty-native";
 /// Strict types id for the library providing data types for RGB consensus.
 pub const LIB_ID_RGB_COMMIT: &str =
-    "stl:f9ccbAlh-W010xVQ-RGvgiOB-FddwvKC-~zlOn90-j_YOqvw#jimmy-clark-canary";
+    "stl:ZqLZTQlK-QVBWlH3-Kg8iJ8I-7DgboM3-hVgUK88-sFcEeVk#leonid-cantina-film";
 /// Strict types id for the library providing data types for RGB consensus.
 pub const LIB_ID_RGB_LOGIC: &str =
-    "stl:fWE3V~d1-l_17zWw-VCqj1TS-1GNiCX3-SgbOSL~-C6m915s#motel-balance-sofia";
+    "stl:1_oMvyia-IfKb5Cq-T3fvBnY-UBYjgcZ-hTrAUGm-t~fFN5A#joker-boston-olga";
 
-fn _rgb_commit_stl() -> Result<TypeLib, Box<CompileError>> {
-    Ok(LibBuilder::with(libname!(LIB_NAME_RGB_COMMIT), [
-        std_stl().to_dependency_types(),
-        strict_types_stl().to_dependency_types(),
-        commit_verify_stl().to_dependency_types(),
-        bp_tx_stl().to_dependency_types(),
-        bp_core_stl().to_dependency_types(),
-        aluvm_stl().to_dependency_types(),
+pub fn commit_verify_stl() -> TypeLib {
+    LibBuilder::with(libname!(LIB_NAME_COMMIT_VERIFY), [
+        strict_types::stl::std_stl().to_dependency_types()
     ])
-    .transpile::<Schema>()
-    .transpile::<Schema>()
-    .transpile::<Genesis>()
-    .transpile::<Txid>()
-    .transpile::<TransitionBundle>()
-    .transpile::<BundleId>()
-    .transpile::<OpCommitment>()
-    .compile()?)
+    .transpile::<MerkleHash>()
+    .transpile::<MerkleNode>()
+    .transpile::<StrictHash>()
+    .transpile::<mpc::Commitment>()
+    .transpile::<mpc::Leaf>()
+    .transpile::<mpc::MerkleBlock>()
+    .transpile::<mpc::MerkleConcealed>()
+    .transpile::<mpc::MerkleProof>()
+    .transpile::<mpc::MerkleTree>()
+    .compile()
+    .unwrap()
 }
 
-fn _rgb_logic_stl() -> Result<TypeLib, Box<CompileError>> {
-    Ok(LibBuilder::with(libname!(LIB_NAME_RGB_LOGIC), [
-        std_stl().to_dependency_types(),
-        strict_types_stl().to_dependency_types(),
+/// Generates strict type library providing data types from [`dbc`] and
+/// [`seals`] crates.
+pub fn bp_core_stl() -> TypeLib {
+    LibBuilder::with(libname!(LIB_NAME_BPCORE), [
+        bitcoin_stl().to_dependency_types(),
         commit_verify_stl().to_dependency_types(),
-        bp_consensus_stl().to_dependency_types(),
-        bp_core_stl().to_dependency_types(),
-        aluvm_stl().to_dependency_types(),
-        rgb_commit_stl().to_dependency_types(),
     ])
-    .transpile::<GlobalOrd>()
-    .transpile::<DbcProof>()
-    .compile()?)
+    .transpile::<dbc::Anchor<dbc::opret::OpretProof>>()
+    .transpile::<dbc::Anchor<dbc::tapret::TapretProof>>()
+    .transpile::<seals::SecretSeal>()
+    .transpile::<txout::BlindSeal<TxPtr>>()
+    .transpile::<txout::BlindSeal<Txid>>()
+    .transpile::<txout::ExplicitSeal<TxPtr>>()
+    .transpile::<txout::ExplicitSeal<Txid>>()
+    .compile()
+    .unwrap()
 }
 
 /// Generates strict type library providing data types for RGB consensus.
 pub fn rgb_commit_stl() -> TypeLib {
-    _rgb_commit_stl().expect("invalid strict type RGB consensus commitments library")
+    LibBuilder::with(libname!(LIB_NAME_RGB_COMMIT), [
+        std_stl().to_dependency_types(),
+        strict_types_stl().to_dependency_types(),
+        commit_verify_stl().to_dependency_types(),
+        bitcoin_tx_stl().to_dependency_types(),
+        bp_core_stl().to_dependency_types(),
+        aluvm_stl().to_dependency_types(),
+    ])
+    .transpile::<BundleId>()
+    .transpile::<Genesis>()
+    .transpile::<OpCommitment>()
+    .transpile::<Schema>()
+    .transpile::<TransitionBundle>()
+    .transpile::<Txid>()
+    .compile()
+    .unwrap()
 }
 
 /// Generates strict type library providing data types for RGB consensus.
 pub fn rgb_logic_stl() -> TypeLib {
-    _rgb_logic_stl().expect("invalid strict type RGB consensus logic library")
+    LibBuilder::with(libname!(LIB_NAME_RGB_LOGIC), [
+        bitcoin_stl().to_dependency_types(),
+        bp_core_stl().to_dependency_types(),
+        rgb_commit_stl().to_dependency_types(),
+    ])
+    .transpile::<DbcProof>()
+    .transpile::<GlobalOrd>()
+    .compile()
+    .unwrap()
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn commit_verify_lib_id() {
+        let lib = commit_verify_stl();
+        assert_eq!(lib.id().to_string(), LIB_ID_COMMIT_VERIFY);
+    }
+
+    #[test]
+    fn bp_core_lib_id() {
+        let lib = bp_core_stl();
+        assert_eq!(lib.id().to_string(), LIB_ID_BPCORE);
+    }
 
     #[test]
     fn commit_lib_id() {

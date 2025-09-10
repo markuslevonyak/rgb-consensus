@@ -28,7 +28,7 @@ use std::fmt::{self, Debug, Display, Formatter};
 use std::num::NonZeroU32;
 use std::rc::Rc;
 
-use bp::{BlockHeight, Outpoint, Txid};
+use bitcoin::{OutPoint as Outpoint, Txid};
 use chrono::{MappedLocalTime, TimeZone, Utc};
 use strict_encoding::{StrictDecode, StrictDumb, StrictEncode};
 
@@ -37,6 +37,8 @@ use crate::{
     GlobalStateType, GraphSeal, Layer1, Metadata, OpFullType, OpId, Operation, RevealedData,
     RevealedState, Transition, TransitionType, TypedAssigns, LIB_NAME_RGB_LOGIC,
 };
+
+pub type BlockHeight = NonZeroU32;
 
 /// The type is used during validation and computing a contract state. It
 /// combines both the operation with the information required for its ordering

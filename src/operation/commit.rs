@@ -30,12 +30,12 @@ use amplify::hex::{FromHex, ToHex};
 use amplify::num::u256;
 use amplify::{hex, ByteArray, Bytes32, FromSliceError, Wrapper};
 use baid64::{Baid64ParseError, DisplayBaid64, FromBaid64Str};
-use commit_verify::{
+use strict_encoding::StrictDumb;
+
+use crate::commit_verify::{
     mpc, CommitEncode, CommitEngine, CommitId, CommitmentId, Conceal, DigestExt, MerkleHash,
     MerkleLeaves, Sha256, StrictHash,
 };
-use strict_encoding::StrictDumb;
-
 use crate::{
     impl_serde_baid64, Assign, AssignmentType, Assignments, BundleId, ChainNet, ExposedSeal,
     ExposedState, Ffv, Genesis, GlobalState, GlobalStateType, Operation, RevealedData,
@@ -183,8 +183,6 @@ impl AssignmentIndex {
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_RGB_COMMIT)]
-#[derive(CommitEncode)]
-#[commit_encode(strategy = strict, id = DiscloseHash)]
 pub struct OpDisclose {
     pub id: OpId,
     pub seals: MediumOrdMap<AssignmentIndex, SecretSeal>,
@@ -192,14 +190,24 @@ pub struct OpDisclose {
     pub data: MediumOrdMap<AssignmentIndex, RevealedData>,
 }
 
+impl CommitEncode for OpDisclose {
+    type CommitmentId = DiscloseHash;
+
+    fn commit_encode(&self, e: &mut CommitEngine) { e.commit_to_serialized(&self); }
+}
+
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 #[derive(StrictType, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_RGB_COMMIT)]
-#[derive(CommitEncode)]
-#[commit_encode(strategy = strict, id = DiscloseHash)]
 pub struct BundleDisclosure {
     pub id: BundleId,
     pub known_transitions: Confined<BTreeSet<DiscloseHash>, 1, U16MAX>,
+}
+
+impl CommitEncode for BundleDisclosure {
+    type CommitmentId = DiscloseHash;
+
+    fn commit_encode(&self, e: &mut CommitEngine) { e.commit_to_serialized(&self); }
 }
 
 impl StrictDumb for BundleDisclosure {
@@ -253,8 +261,6 @@ pub enum TypeCommitment {
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_RGB_COMMIT)]
-#[derive(CommitEncode)]
-#[commit_encode(strategy = strict, id = OpId)]
 pub struct OpCommitment {
     pub ffv: Ffv,
     pub nonce: u64,
@@ -263,6 +269,12 @@ pub struct OpCommitment {
     pub globals: MerkleHash,
     pub inputs: MerkleHash,
     pub assignments: MerkleHash,
+}
+
+impl CommitEncode for OpCommitment {
+    type CommitmentId = OpId;
+
+    fn commit_encode(&self, e: &mut CommitEngine) { e.commit_to_serialized(&self); }
 }
 
 impl Genesis {

@@ -22,8 +22,8 @@
 
 use std::str::FromStr;
 
-use bp::BlockHash;
-use strict_encoding::{StrictDecode, StrictEncode, StrictType};
+use bitcoin::BlockHash;
+use strict_encoding::{DefaultBasedStrictDumb, StrictDecode, StrictEncode, StrictType};
 
 use crate::{LIB_NAME_RGB_COMMIT, LIB_NAME_RGB_LOGIC};
 
@@ -65,6 +65,8 @@ pub enum ChainNet {
     LiquidMainnet = 5,
     LiquidTestnet = 6,
 }
+
+impl DefaultBasedStrictDumb for ChainNet {}
 
 impl ChainNet {
     pub fn prefix(&self) -> &str {

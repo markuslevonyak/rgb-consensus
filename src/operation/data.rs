@@ -22,7 +22,7 @@
 
 use amplify::confinement::SmallBlob;
 use amplify::Wrapper;
-use strict_encoding::StrictType;
+use strict_encoding::{DefaultBasedStrictDumb, StrictType};
 
 use super::ExposedState;
 use crate::{RevealedState, StateType, LIB_NAME_RGB_COMMIT};
@@ -35,6 +35,8 @@ use crate::{RevealedState, StateType, LIB_NAME_RGB_COMMIT};
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(crate = "serde_crate"))]
 pub struct VoidState(());
 
+impl DefaultBasedStrictDumb for VoidState {}
+
 impl ExposedState for VoidState {
     fn state_type(&self) -> StateType { StateType::Void }
     fn state_data(&self) -> RevealedState { RevealedState::Void }
@@ -46,6 +48,8 @@ impl ExposedState for VoidState {
 #[derive(StrictType, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_RGB_COMMIT)]
 pub struct RevealedData(SmallBlob);
+
+impl DefaultBasedStrictDumb for RevealedData {}
 
 impl RevealedData {
     /// Convenience constructor.

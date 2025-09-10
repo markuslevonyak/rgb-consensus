@@ -27,16 +27,17 @@
 extern crate amplify;
 #[macro_use]
 extern crate strict_encoding;
-#[macro_use]
-extern crate commit_verify;
 
 #[cfg(feature = "serde")]
 #[macro_use]
 extern crate serde_crate as serde;
 extern crate core;
 
+pub mod commit_verify;
+pub mod dbc;
 mod operation;
 pub mod schema;
+pub mod seals;
 pub mod validation;
 #[macro_use]
 pub mod vm;
@@ -44,18 +45,19 @@ pub mod vm;
 pub mod stl;
 
 pub mod prelude {
-    pub use bp::Txid;
-    pub use daggy;
+    pub use bitcoin::Txid;
+    pub use dbc::*;
     pub use operation::*;
     pub use schema::*;
+    pub use seals::*;
+    pub use {bitcoin, daggy, secp256k1};
 
-    #[cfg(feature = "stl")]
-    pub use super::stl;
     use super::*;
     pub use super::{schema, validation, vm};
 }
 
 pub use prelude::*;
+use strict_encoding::DefaultBasedStrictDumb;
 
 pub const LIB_NAME_RGB_COMMIT: &str = "RGBCommit";
 pub const LIB_NAME_RGB_LOGIC: &str = "RGBLogic";
@@ -71,6 +73,8 @@ pub const LIB_NAME_RGB_LOGIC: &str = "RGBLogic";
     serde(crate = "serde_crate", rename_all = "camelCase")
 )]
 pub struct Ffv(u16);
+
+impl DefaultBasedStrictDumb for Ffv {}
 
 mod _ffv {
     use strict_encoding::{DecodeError, ReadTuple, StrictDecode, TypedRead};

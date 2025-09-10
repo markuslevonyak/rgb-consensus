@@ -24,8 +24,9 @@ use std::collections::btree_map;
 
 use amplify::confinement::{SmallBlob, TinyOrdMap};
 use amplify::{confinement, Wrapper};
-use commit_verify::StrictHash;
+use strict_encoding::DefaultBasedStrictDumb;
 
+use crate::commit_verify::{CommitEncode, CommitEngine, StrictHash};
 use crate::{schema, LIB_NAME_RGB_COMMIT};
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Display, Error, From)]
@@ -48,6 +49,8 @@ pub enum MetadataError {
 #[derive(StrictType, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_RGB_COMMIT)]
 pub struct MetaValue(SmallBlob);
+
+impl DefaultBasedStrictDumb for MetaValue {}
 
 #[cfg(feature = "serde")]
 mod _serde {
@@ -78,14 +81,20 @@ mod _serde {
 #[wrapper_mut(DerefMut)]
 #[derive(StrictType, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_RGB_COMMIT)]
-#[derive(CommitEncode)]
-#[commit_encode(strategy = strict, id = StrictHash)]
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
     serde(crate = "serde_crate", transparent)
 )]
 pub struct Metadata(TinyOrdMap<schema::MetaType, MetaValue>);
+
+impl CommitEncode for Metadata {
+    type CommitmentId = StrictHash;
+
+    fn commit_encode(&self, e: &mut CommitEngine) { e.commit_to_serialized(&self); }
+}
+
+impl DefaultBasedStrictDumb for Metadata {}
 
 impl Metadata {
     pub fn add_value(

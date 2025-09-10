@@ -23,13 +23,15 @@
 use core::fmt::Debug;
 use std::hash::Hash;
 
-pub use bp::seals::txout::blind::{ChainBlindSeal, ParseError, SingleBlindSeal};
-pub use bp::seals::txout::TxoSeal;
-use bp::seals::txout::{BlindSeal, ExplicitSeal, TxPtr};
-pub use bp::seals::SecretSeal;
-use bp::Txid;
-use commit_verify::Conceal;
+use bitcoin::Txid;
 use strict_encoding::{StrictDecode, StrictDumb, StrictEncode};
+
+use crate::commit_verify::Conceal;
+pub use crate::seals::txout::blind::{ChainBlindSeal, ParseError, SingleBlindSeal};
+use crate::seals::txout::ExplicitSeal;
+pub use crate::seals::txout::TxoSeal;
+pub use crate::seals::SecretSeal;
+use crate::txout::{BlindSeal, TxPtr};
 
 pub type GenesisSeal = SingleBlindSeal;
 pub type GraphSeal = ChainBlindSeal;
@@ -59,7 +61,7 @@ pub trait ExposedSeal:
             .unwrap_or(ExplicitSeal::new(self.outpoint_or(witness_id)))
     }
 
-    /// Attempts to convert to a BlindSeal<Txid>,
+    /// Attempts to convert to a `BlindSeal<Txid>`,
     /// returning None if both self.txid() and witness_id are None
     fn with_witness_id(self, witness_id: Option<Txid>) -> Option<BlindSeal<Txid>>;
 }
@@ -77,18 +79,18 @@ impl ExposedSeal for BlindSeal<Txid> {
 
 #[cfg(test)]
 mod test {
-    use amplify::hex::FromHex;
-    use bp::seals::txout::{BlindSeal, TxPtr};
-    use bp::Vout;
+    use std::str::FromStr;
 
     use super::*;
+    use crate::seals::txout::{BlindSeal, TxPtr};
+    use crate::Vout;
 
     #[test]
     fn secret_seal_is_sha256d() {
         let reveal = BlindSeal {
             blinding: 54683213134637,
             txid: TxPtr::Txid(
-                Txid::from_hex("646ca5c1062619e2a2d60771c9dfd820551fb773e4dc8c4ed67965a8d1fae839")
+                Txid::from_str("646ca5c1062619e2a2d60771c9dfd820551fb773e4dc8c4ed67965a8d1fae839")
                     .unwrap(),
             ),
             vout: Vout::from(2),

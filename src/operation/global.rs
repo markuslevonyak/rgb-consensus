@@ -25,7 +25,7 @@ use std::vec;
 
 use amplify::confinement::{Confined, TinyOrdMap, U16};
 use amplify::{confinement, Wrapper};
-use strict_encoding::StrictDumb;
+use strict_encoding::{DefaultBasedStrictDumb, StrictDumb};
 
 use crate::{schema, RevealedData, LIB_NAME_RGB_COMMIT};
 
@@ -67,6 +67,8 @@ impl IntoIterator for GlobalValues {
     serde(crate = "serde_crate", transparent)
 )]
 pub struct GlobalState(TinyOrdMap<schema::GlobalStateType, GlobalValues>);
+
+impl DefaultBasedStrictDumb for GlobalState {}
 
 impl GlobalState {
     pub fn add_state(

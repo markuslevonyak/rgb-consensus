@@ -24,8 +24,8 @@ use std::io;
 use std::ops::RangeInclusive;
 
 use strict_encoding::{
-    DecodeError, ReadStruct, StrictDecode, StrictEncode, StrictProduct, StrictStruct, StrictType,
-    TypeName, TypedRead, TypedWrite, WriteStruct,
+    DecodeError, DefaultBasedStrictDumb, ReadStruct, StrictDecode, StrictEncode, StrictProduct,
+    StrictStruct, StrictType, TypeName, TypedRead, TypedWrite, WriteStruct,
 };
 
 use crate::LIB_NAME_RGB_COMMIT;
@@ -124,6 +124,7 @@ impl TryFrom<RangeInclusive<u16>> for Occurrences {
     }
 }
 
+impl DefaultBasedStrictDumb for Occurrences {}
 impl StrictType for Occurrences {
     const STRICT_LIB_NAME: &'static str = LIB_NAME_RGB_COMMIT;
     fn strict_name() -> Option<TypeName> { Some(tn!("Occurrences")) }

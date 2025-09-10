@@ -27,7 +27,7 @@ use std::collections::BTreeSet;
 
 use aluvm::library::{Lib, LibId};
 use amplify::confinement::ConfinedOrdMap;
-use bp::Txid;
+use bitcoin::Txid;
 use strict_types::TypeSystem;
 
 use super::EAnchor;

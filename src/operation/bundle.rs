@@ -21,16 +21,50 @@
 // limitations under the License.
 
 use std::collections::BTreeSet;
+use std::num::ParseIntError;
+use std::str::FromStr;
 
 use amplify::confinement::{Confined, NonEmptyOrdMap, NonEmptyVec, U16 as U16MAX};
 use amplify::{Bytes32, Wrapper};
-use bp::Vout;
-use commit_verify::{mpc, CommitEncode, CommitEngine, CommitId, CommitmentId, DigestExt, Sha256};
-use strict_encoding::{StrictDumb, StrictEncode};
+use strict_encoding::{StrictDumb, StrictEncode, LIB_NAME_BITCOIN};
 
 use super::{GraphSeal, Opout};
+use crate::commit_verify::{
+    mpc, CommitEncode, CommitEngine, CommitId, CommitmentId, DigestExt, Sha256,
+};
 use crate::operation::operations::Operation;
 use crate::{OpId, Transition, LIB_NAME_RGB_COMMIT};
+
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display, From)]
+#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+#[strict_type(lib = LIB_NAME_BITCOIN)]
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(crate = "serde_crate", transparent)
+)]
+#[display(inner)]
+// 0xFFFFFFFF used in coinbase
+pub struct Vout(u32);
+
+impl Vout {
+    pub const fn from_u32(u: u32) -> Self { Vout(u) }
+    #[inline]
+    pub const fn into_u32(self) -> u32 { self.0 }
+    #[inline]
+    pub const fn into_usize(self) -> usize { self.0 as usize }
+    #[inline]
+    pub const fn to_u32(&self) -> u32 { self.0 }
+    #[inline]
+    pub const fn to_usize(&self) -> usize { self.0 as usize }
+}
+
+impl FromStr for Vout {
+    type Err = ParseIntError;
+
+    #[inline]
+    fn from_str(s: &str) -> Result<Self, Self::Err> { s.parse().map(Self) }
+}
 
 pub type Vin = Vout;
 

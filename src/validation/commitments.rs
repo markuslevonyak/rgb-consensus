@@ -20,14 +20,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use bp::dbc::opret::{OpretError, OpretProof};
-use bp::dbc::tapret::TapretProof;
-use bp::dbc::Method;
-use bp::{dbc, Tx};
-use commit_verify::mpc::Commitment;
-use commit_verify::{ConvolveVerifyError, EmbedVerifyError};
+use bitcoin::Transaction as Tx;
 use strict_encoding::{StrictDeserialize, StrictDumb, StrictSerialize};
 
+use crate::commit_verify::mpc::Commitment;
+use crate::commit_verify::{ConvolveVerifyError, EmbedVerifyError};
+use crate::dbc::opret::{OpretError, OpretProof};
+use crate::dbc::tapret::TapretProof;
+use crate::dbc::{self, Method};
 use crate::LIB_NAME_RGB_LOGIC;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Display, Error)]
