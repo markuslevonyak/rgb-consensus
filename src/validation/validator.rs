@@ -272,10 +272,8 @@ impl<
                 chain_net,
             )));
         }
-        if resolver.check_chain_net(chain_net).is_err() {
-            return Err(ValidationError::InvalidConsignment(Failure::ResolverChainNetMismatch(
-                chain_net,
-            )));
+        if let Err(e) = resolver.check_chain_net(chain_net) {
+            return Err(ValidationError::ResolverError(e));
         }
 
         validator.validate_schema()?;
