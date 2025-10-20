@@ -23,6 +23,7 @@
 use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::cmp::Ordering;
+use std::collections::BTreeMap;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::num::NonZeroU32;
 use std::rc::Rc;
@@ -32,9 +33,9 @@ use chrono::{MappedLocalTime, TimeZone, Utc};
 use strict_encoding::{StrictDecode, StrictDumb, StrictEncode};
 
 use crate::{
-    AssignmentType, Assignments, AssignmentsRef, BundleId, ContractId, FungibleState, Genesis,
-    GlobalState, GlobalStateType, GraphSeal, Layer1, Metadata, OpFullType, OpId, Operation,
-    RevealedData, Transition, TransitionType, TypedAssigns, LIB_NAME_RGB_LOGIC,
+    AssignmentType, AssignmentsRef, BundleId, ContractId, FungibleState, Genesis, GlobalState,
+    GlobalStateType, GraphSeal, Layer1, Metadata, OpFullType, OpId, Operation, RevealedData,
+    RevealedState, Transition, TransitionType, TypedAssigns, LIB_NAME_RGB_LOGIC,
 };
 
 /// The type is used during validation and computing a contract state. It
@@ -444,14 +445,15 @@ pub struct VmContext<'op, S: ContractStateAccess> {
     pub contract_state: Rc<RefCell<S>>,
 }
 
+type PrevState = BTreeMap<AssignmentType, Vec<RevealedState>>;
 pub struct OpInfo<'op> {
     pub id: OpId,
-    pub prev_state: &'op Assignments<GraphSeal>,
+    pub prev_state: &'op PrevState,
     pub op: &'op OrdOpRef<'op>,
 }
 
 impl<'op> OpInfo<'op> {
-    pub fn with(id: OpId, op: &'op OrdOpRef<'op>, prev_state: &'op Assignments<GraphSeal>) -> Self {
+    pub fn with(id: OpId, op: &'op OrdOpRef<'op>, prev_state: &'op PrevState) -> Self {
         OpInfo { id, prev_state, op }
     }
 

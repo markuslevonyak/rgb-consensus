@@ -26,14 +26,16 @@ use std::collections::{btree_map, BTreeSet};
 use std::hash::Hash;
 
 use amplify::confinement::{Confined, NonEmptyVec, SmallOrdMap, U16};
+use bp::seals::txout::BlindSeal;
+use bp::Txid;
 use commit_verify::Conceal;
 use strict_encoding::{StrictDecode, StrictDumb, StrictEncode};
 
 use super::ExposedState;
 use crate::operation::seal::GenesisSeal;
 use crate::{
-    AssignmentType, ExposedSeal, GraphSeal, RevealedData, RevealedValue, SecretSeal, StateType,
-    VoidState, LIB_NAME_RGB_COMMIT,
+    AssignmentType, ExposedSeal, GraphSeal, RevealedData, RevealedState, RevealedValue, SecretSeal,
+    StateType, VoidState, LIB_NAME_RGB_COMMIT,
 };
 
 #[derive(Wrapper, WrapperMut, Clone, PartialEq, Eq, PartialOrd, Ord, Debug, From)]
@@ -94,6 +96,8 @@ pub enum Assign<State: ExposedState, Seal: ExposedSeal> {
     #[strict_type(tag = 0x01)]
     ConfidentialSeal { seal: SecretSeal, state: State },
 }
+
+pub type RevealedAssign = Assign<RevealedState, BlindSeal<Txid>>;
 
 // Consensus-critical!
 // Assignment indexes are part of the transition ancestor's commitment, so
@@ -442,6 +446,38 @@ impl<Seal: ExposedSeal> TypedAssigns<Seal> {
             }
             _ => Err(UnknownDataError),
         }
+    }
+
+    pub fn to_revealed_assign_at(
+        &self,
+        index: u16,
+        witness_id: Option<Txid>,
+    ) -> Result<RevealedAssign, UnknownDataError> {
+        let (seal, state) = match self {
+            Self::Declarative(vec) => {
+                let (seal, _) = vec
+                    .get(index as usize)
+                    .and_then(Assign::as_revealed)
+                    .ok_or(UnknownDataError)?;
+                (seal, RevealedState::Void)
+            }
+            Self::Fungible(vec) => {
+                let (seal, state) = vec
+                    .get(index as usize)
+                    .and_then(Assign::as_revealed)
+                    .ok_or(UnknownDataError)?;
+                (seal, RevealedState::Fungible(*state))
+            }
+            Self::Structured(vec) => {
+                let (seal, state) = vec
+                    .get(index as usize)
+                    .and_then(Assign::as_revealed)
+                    .ok_or(UnknownDataError)?;
+                (seal, RevealedState::Structured(state.clone()))
+            }
+        };
+        let seal = seal.with_witness_id(witness_id).ok_or(UnknownDataError)?;
+        Ok(Assign::revealed(seal, state))
     }
 }
 

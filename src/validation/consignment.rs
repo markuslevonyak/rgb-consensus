@@ -23,6 +23,8 @@
 //! Common API for accessing RGB contract operation graph, including individual
 //! state transitions, genesis, outputs, assignments & single-use-seal data.
 
+use std::collections::BTreeSet;
+
 use aluvm::library::{Lib, LibId};
 use amplify::confinement::ConfinedOrdMap;
 use bp::Txid;
@@ -115,27 +117,13 @@ impl<C: ConsignmentApi> ConsignmentApi for CheckedConsignment<'_, C> {
 
     fn types(&self) -> &TypeSystem { self.0.types() }
 
-    fn scripts(&self) -> &Scripts { self.0.scripts() }
-
-    fn operation(&self, opid: OpId) -> Option<OpRef<'_>> {
-        self.0.operation(opid).filter(|op| op.id() == opid)
-    }
+    fn scripts(&self) -> impl Iterator<Item = &Lib> { self.0.scripts() }
 
     fn genesis(&self) -> &Genesis { self.0.genesis() }
 
-    fn bundles<'iter>(&self) -> impl Iterator<Item = TransitionBundle> + 'iter { self.0.bundles() }
-
-    fn bundle_ids<'iter>(&self) -> impl Iterator<Item = BundleId> + 'iter { self.0.bundle_ids() }
-
-    fn bundle(&self, bundle_id: BundleId) -> Option<&TransitionBundle> {
-        self.0
-            .bundle(bundle_id)
-            .filter(|b| b.bundle_id() == bundle_id)
+    fn bundles_info(&self) -> impl Iterator<Item = (&TransitionBundle, &EAnchor, Txid)> {
+        self.0.bundles_info()
     }
-
-    fn anchor(&self, bundle_id: BundleId) -> Option<(Txid, &EAnchor)> { self.0.anchor(bundle_id) }
-
-    fn op_witness_id(&self, opid: OpId) -> Option<Txid> { self.0.op_witness_id(opid) }
 }
 
 /// Trait defining common data access API for all storage-related RGB structures
@@ -154,27 +142,19 @@ pub trait ConsignmentApi {
 
     /// Returns reference to a collection of AluVM libraries used for the
     /// validation.
-    fn scripts(&self) -> &Scripts;
-
-    /// Retrieves reference to an operation (genesis or state transition) matching the provided id,
-    /// or `None` otherwise
-    fn operation(&self, opid: OpId) -> Option<OpRef<'_>>;
+    fn scripts(&self) -> impl Iterator<Item = &Lib>;
 
     /// Contract genesis.
     fn genesis(&self) -> &Genesis;
 
-    /// Returns iterator over all bundles present in the consignment.
-    fn bundles<'iter>(&self) -> impl Iterator<Item = TransitionBundle> + 'iter;
+    /// Returns iterator over all bundle information in the consignment
+    fn bundles_info(&self) -> impl Iterator<Item = (&TransitionBundle, &EAnchor, Txid)>;
 
     /// Returns iterator over all bundle ids present in the consignment.
-    fn bundle_ids<'iter>(&self) -> impl Iterator<Item = BundleId> + 'iter;
-
-    /// Returns reference to a bundle given a bundle id.
-    fn bundle(&self, bundle_id: BundleId) -> Option<&TransitionBundle>;
-
-    /// Returns a grip given a bundle id.
-    fn anchor(&self, bundle_id: BundleId) -> Option<(Txid, &EAnchor)>;
-
-    /// Returns witness id for a given operation.
-    fn op_witness_id(&self, opid: OpId) -> Option<Txid>;
+    fn bundle_ids<'iter>(&self) -> impl Iterator<Item = BundleId> + 'iter {
+        self.bundles_info()
+            .map(|(b, _, _)| b.bundle_id())
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+    }
 }

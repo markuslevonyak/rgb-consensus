@@ -21,40 +21,37 @@
 // limitations under the License.
 
 use std::cell::RefCell;
-use std::collections::btree_map::Entry;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::rc::Rc;
 
 use aluvm::data::Number;
 use aluvm::isa::Instr;
 use aluvm::reg::{Reg32, RegA};
 use aluvm::Vm;
-use amplify::confinement::{Confined, NonEmptyVec};
+use amplify::confinement::Confined;
 use amplify::Wrapper;
 use strict_types::TypeSystem;
 
 use super::validator::ValidationError;
 use super::Failure;
-use crate::assignments::AssignVec;
 use crate::schema::{AssignmentsSchema, GlobalSchema};
-use crate::validation::{CheckedConsignment, ConsignmentApi};
+use crate::validation::Scripts;
 use crate::vm::{ContractStateAccess, ContractStateEvolve, OpInfo, OrdOpRef, RgbIsa, VmContext};
 use crate::{
-    Assign, AssignmentType, Assignments, AssignmentsRef, ExposedSeal, ExposedState, GlobalState,
-    GlobalStateSchema, GlobalValues, GraphSeal, Inputs, MetaSchema, Metadata, OpId, Operation,
-    Opout, OwnedStateSchema, RevealedState, Schema, SealClosingStrategy, Transition, TypedAssigns,
+    Assign, AssignmentType, Assignments, AssignmentsRef, ExposedSeal, ExposedState, Genesis,
+    GlobalState, GlobalStateSchema, GlobalValues, MetaSchema, Metadata, OpId, Operation,
+    OwnedStateSchema, RevealedState, Schema, SealClosingStrategy, Transition, TypedAssigns,
 };
 
 impl Schema {
-    pub fn validate_state<
-        'validator,
-        C: ConsignmentApi,
-        S: ContractStateAccess + ContractStateEvolve,
-    >(
+    pub fn validate_state<'validator, S: ContractStateAccess + ContractStateEvolve>(
         &'validator self,
-        consignment: &'validator CheckedConsignment<'_, C>,
+        consignment_types: &'validator TypeSystem,
+        consignment_scripts: &'validator Scripts,
+        genesis: &'validator Genesis,
         op: OrdOpRef,
         contract_state: Rc<RefCell<S>>,
+        prev_state: &'validator BTreeMap<AssignmentType, Vec<RevealedState>>,
     ) -> Result<(), ValidationError> {
         let opid = op.id();
 
@@ -85,15 +82,6 @@ impl Schema {
                 },
                 ..,
             ) => {
-                // Right now we do not have actions to implement; but later
-                // we may have embedded procedures which must be verified
-                // here
-                /*
-                if let Some(procedure) = transition_type.abi.get(&TransitionAction::NoOp) {
-
-                }
-                 */
-
                 let transition_schema = match self.transitions.get(transition_type) {
                     None => {
                         return Err(ValidationError::InvalidConsignment(
@@ -114,26 +102,19 @@ impl Schema {
             }
         };
 
-        self.validate_metadata(opid, op.metadata(), metadata_schema, consignment.types())?;
-        self.validate_global_state(opid, op.globals(), global_schema, consignment.types())?;
-        let prev_state = if let OrdOpRef::Transition(transition, ..) = op {
-            let prev_state = extract_prev_state(consignment, opid, &transition.inputs)?;
-            self.validate_prev_state(opid, &prev_state, owned_schema)?;
-            prev_state
-        } else {
-            Assignments::default()
-        };
+        self.validate_metadata(opid, op.metadata(), metadata_schema, consignment_types)?;
+        self.validate_global_state(opid, op.globals(), global_schema, consignment_types)?;
+        self.validate_prev_state(opid, prev_state, owned_schema)?;
         match op.assignments() {
             AssignmentsRef::Genesis(assignments) => {
-                self.validate_owned_state(opid, assignments, assign_schema, consignment.types())?
+                self.validate_new_state(opid, assignments, assign_schema, consignment_types)?
             }
             AssignmentsRef::Graph(assignments) => {
-                self.validate_owned_state(opid, assignments, assign_schema, consignment.types())?
+                self.validate_new_state(opid, assignments, assign_schema, consignment_types)?
             }
         };
 
-        let genesis = consignment.genesis();
-        let op_info = OpInfo::with(opid, &op, &prev_state);
+        let op_info = OpInfo::with(opid, &op, prev_state);
         let context = VmContext {
             contract_id: genesis.contract_id(),
             op_info,
@@ -144,7 +125,7 @@ impl Schema {
         // we need to make sure that the operation data match the schema, so
         // scripts are not required to validate the structure of the state
         if let Some(validator) = validator {
-            let scripts = consignment.scripts();
+            let scripts = consignment_scripts;
             let mut vm = Vm::<Instr<RgbIsa<S>>>::new();
             if let Some(ty) = ty {
                 vm.registers.set_n(RegA::A16, Reg32::Reg0, ty);
@@ -287,32 +268,26 @@ impl Schema {
         Ok(())
     }
 
-    fn validate_prev_state<Seal: ExposedSeal>(
+    fn validate_prev_state(
         &self,
         id: OpId,
-        owned_state: &Assignments<Seal>,
+        prev_state: &BTreeMap<AssignmentType, Vec<RevealedState>>,
         assign_schema: &AssignmentsSchema,
     ) -> Result<(), ValidationError> {
-        for owned_type_id in owned_state.keys() {
-            if !assign_schema.contains_key(owned_type_id) {
+        let type_ids = prev_state
+            .keys()
+            .chain(assign_schema.keys())
+            .collect::<HashSet<_>>();
+        for type_id in type_ids {
+            let Some(schema_occurrences) = assign_schema.get(type_id) else {
                 return Err(ValidationError::InvalidConsignment(
-                    Failure::SchemaUnknownAssignmentType(id, *owned_type_id),
+                    Failure::SchemaUnknownAssignmentType(id, *type_id),
                 ));
-            }
-        }
-
-        for (owned_type_id, occ) in assign_schema {
-            let len = owned_state
-                .get(owned_type_id)
-                .map(TypedAssigns::len_u16)
-                .unwrap_or(0);
-
-            // Checking number of ancestor's assignment occurrences
-            if let Err(err) = occ.check(len) {
+            };
+            let len = prev_state.get(type_id).map(|a| a.len() as u16).unwrap_or(0);
+            if let Err(err) = schema_occurrences.check(len) {
                 return Err(ValidationError::InvalidConsignment(Failure::SchemaInputOccurrences(
-                    id,
-                    *owned_type_id,
-                    err,
+                    id, *type_id, err,
                 )));
             }
         }
@@ -320,149 +295,56 @@ impl Schema {
         Ok(())
     }
 
-    fn validate_owned_state<Seal: ExposedSeal>(
+    fn validate_new_state<Seal: ExposedSeal>(
         &self,
         id: OpId,
-        owned_state: &Assignments<Seal>,
+        new_state: &Assignments<Seal>,
         assign_schema: &AssignmentsSchema,
         types: &TypeSystem,
     ) -> Result<(), ValidationError> {
-        for assignment_type_id in owned_state.keys() {
-            if !assign_schema.contains_key(assignment_type_id) {
+        let type_ids = new_state
+            .keys()
+            .chain(assign_schema.keys())
+            .collect::<HashSet<_>>();
+        for type_id in type_ids {
+            let Some(schema_occurrences) = assign_schema.get(type_id) else {
                 return Err(ValidationError::InvalidConsignment(
-                    Failure::SchemaUnknownAssignmentType(id, *assignment_type_id),
+                    Failure::SchemaUnknownAssignmentType(id, *type_id),
                 ));
-            }
-        }
-
-        for (state_id, occ) in assign_schema {
-            let len = owned_state
-                .get(state_id)
+            };
+            let len = new_state
+                .get(type_id)
                 .map(TypedAssigns::len_u16)
                 .unwrap_or(0);
-
-            // Checking number of assignment occurrences
-            if let Err(err) = occ.check(len) {
+            if let Err(err) = schema_occurrences.check(len) {
                 return Err(ValidationError::InvalidConsignment(
-                    Failure::SchemaAssignmentOccurrences(id, *state_id, err),
+                    Failure::SchemaAssignmentOccurrences(id, *type_id, err),
                 ));
             }
-
             let assignment = &self
                 .owned_types
-                .get(state_id)
+                .get(type_id)
                 .expect(
                     "If the assignment were absent, the schema would not be able to pass the \
                      internal validation and we would not reach this point",
                 )
                 .owned_state_schema;
-
-            match owned_state.get(state_id) {
+            match new_state.get(type_id) {
                 None => Ok(()),
                 Some(TypedAssigns::Declarative(set)) => set
                     .iter()
-                    .try_for_each(|data| assignment.validate(id, *state_id, data, types)),
+                    .try_for_each(|data| assignment.validate(id, *type_id, data, types)),
                 Some(TypedAssigns::Fungible(set)) => set
                     .iter()
-                    .try_for_each(|data| assignment.validate(id, *state_id, data, types)),
+                    .try_for_each(|data| assignment.validate(id, *type_id, data, types)),
                 Some(TypedAssigns::Structured(set)) => set
                     .iter()
-                    .try_for_each(|data| assignment.validate(id, *state_id, data, types)),
+                    .try_for_each(|data| assignment.validate(id, *type_id, data, types)),
             }?;
         }
 
         Ok(())
     }
-}
-
-fn extract_prev_state<C: ConsignmentApi>(
-    consignment: &C,
-    opid: OpId,
-    inputs: &Inputs,
-) -> Result<Assignments<GraphSeal>, ValidationError> {
-    let mut assignments: BTreeMap<AssignmentType, TypedAssigns<_>> = bmap! {};
-    for input in inputs {
-        let Opout { op, ty, no } = input;
-
-        let prev_op = match consignment.operation(op) {
-            None => {
-                return Err(ValidationError::InvalidConsignment(Failure::OperationAbsent(op)));
-            }
-            Some(op) => op,
-        };
-
-        let no = no as usize;
-        match prev_op.assignments_by_type(ty) {
-            Some(TypedAssigns::Declarative(prev_assignments)) => {
-                if let Some(prev_assign) = prev_assignments.get(no) {
-                    match assignments.entry(ty) {
-                        Entry::Occupied(mut entry) => {
-                            if let Some(typed_assigns) = entry.get_mut().as_declarative_mut() {
-                                typed_assigns.push(prev_assign.clone()).expect("same size");
-                            }
-                        }
-                        Entry::Vacant(entry) => {
-                            entry.insert(TypedAssigns::Declarative(AssignVec::with(
-                                NonEmptyVec::with(prev_assign.clone()),
-                            )));
-                        }
-                    }
-                } else {
-                    return Err(ValidationError::InvalidConsignment(Failure::NoPrevOut(
-                        opid, input,
-                    )));
-                }
-            }
-            Some(TypedAssigns::Fungible(prev_assignments)) => {
-                if let Some(prev_assign) = prev_assignments.get(no) {
-                    match assignments.entry(ty) {
-                        Entry::Occupied(mut entry) => {
-                            if let Some(typed_assigns) = entry.get_mut().as_fungible_mut() {
-                                typed_assigns.push(prev_assign.clone()).expect("same size");
-                            }
-                        }
-                        Entry::Vacant(entry) => {
-                            entry.insert(TypedAssigns::Fungible(AssignVec::with(
-                                NonEmptyVec::with(prev_assign.clone()),
-                            )));
-                        }
-                    }
-                } else {
-                    return Err(ValidationError::InvalidConsignment(Failure::NoPrevOut(
-                        opid, input,
-                    )));
-                }
-            }
-            Some(TypedAssigns::Structured(prev_assignments)) => {
-                if let Some(prev_assign) = prev_assignments.get(no) {
-                    match assignments.entry(ty) {
-                        Entry::Occupied(mut entry) => {
-                            if let Some(typed_assigns) = entry.get_mut().as_structured_mut() {
-                                typed_assigns.push(prev_assign.clone()).expect("same size");
-                            }
-                        }
-                        Entry::Vacant(entry) => {
-                            entry.insert(TypedAssigns::Structured(AssignVec::with(
-                                NonEmptyVec::with(prev_assign.clone()),
-                            )));
-                        }
-                    }
-                } else {
-                    return Err(ValidationError::InvalidConsignment(Failure::NoPrevOut(
-                        opid, input,
-                    )));
-                }
-            }
-            None => {
-                // Presence of the required owned rights type in the
-                // parent operation was already validated; we have nothing
-                // to report here
-            }
-        }
-    }
-    Ok(Confined::try_from(assignments)
-        .expect("collections is assembled from another collection with the same size requirements")
-        .into())
 }
 
 impl OwnedStateSchema {

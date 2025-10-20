@@ -24,8 +24,8 @@ use core::fmt::Debug;
 use std::hash::Hash;
 
 pub use bp::seals::txout::blind::{ChainBlindSeal, ParseError, SingleBlindSeal};
-use bp::seals::txout::ExplicitSeal;
 pub use bp::seals::txout::TxoSeal;
+use bp::seals::txout::{BlindSeal, ExplicitSeal, TxPtr};
 pub use bp::seals::SecretSeal;
 use bp::Txid;
 use commit_verify::Conceal;
@@ -58,11 +58,22 @@ pub trait ExposedSeal:
         self.to_output_seal()
             .unwrap_or(ExplicitSeal::new(self.outpoint_or(witness_id)))
     }
+
+    /// Attempts to convert to a BlindSeal<Txid>,
+    /// returning None if both self.txid() and witness_id are None
+    fn with_witness_id(self, witness_id: Option<Txid>) -> Option<BlindSeal<Txid>>;
 }
 
-impl ExposedSeal for GraphSeal {}
+impl ExposedSeal for BlindSeal<TxPtr> {
+    fn with_witness_id(self, witness_id: Option<Txid>) -> Option<BlindSeal<Txid>> {
+        let txid = self.txid().or(witness_id)?;
+        Some(BlindSeal::with_blinding(txid, self.vout, self.blinding))
+    }
+}
 
-impl ExposedSeal for GenesisSeal {}
+impl ExposedSeal for BlindSeal<Txid> {
+    fn with_witness_id(self, _witness_id: Option<Txid>) -> Option<BlindSeal<Txid>> { Some(self) }
+}
 
 #[cfg(test)]
 mod test {

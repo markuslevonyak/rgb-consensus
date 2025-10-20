@@ -25,7 +25,7 @@ use core::hash::Hash;
 
 use strict_encoding::{StrictDecode, StrictDumb, StrictEncode};
 
-use crate::{RevealedData, RevealedValue};
+use crate::{RevealedData, RevealedValue, LIB_NAME_RGB_LOGIC};
 
 /// Marker trait for types of state holding explicit state data.
 pub trait ExposedState:
@@ -56,23 +56,29 @@ pub enum StateType {
 
 /// Categories of the state
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug)]
+#[derive(StrictType, StrictEncode, StrictDecode, StrictDumb)]
+#[strict_type(lib = LIB_NAME_RGB_LOGIC, tags = custom)]
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
     serde(crate = "serde_crate", rename_all = "camelCase", tag = "type")
 )]
 pub enum RevealedState {
+    #[strict_type(tag = 0x00, dumb)]
     Void,
+    #[strict_type(tag = 0x01)]
     Fungible(RevealedValue),
+    #[strict_type(tag = 0x02)]
     Structured(RevealedData),
 }
 
-impl RevealedState {
-    pub fn state_type(&self) -> StateType {
+impl ExposedState for RevealedState {
+    fn state_type(&self) -> StateType {
         match self {
             RevealedState::Void => StateType::Void,
             RevealedState::Fungible(_) => StateType::Fungible,
             RevealedState::Structured(_) => StateType::Structured,
         }
     }
+    fn state_data(&self) -> RevealedState { self.clone() }
 }

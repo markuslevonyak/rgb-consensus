@@ -38,7 +38,7 @@ use secp256k1::{ecdsa, Message, PublicKey};
 use super::opcodes::*;
 use super::{ContractStateAccess, VmContext};
 use crate::vm::{GlobalsIter, OrdOpRef};
-use crate::{Assign, AssignmentType, GlobalStateType, MetaType, TypedAssigns};
+use crate::{Assign, AssignmentType, GlobalStateType, MetaType, RevealedState, TypedAssigns};
 
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, Display)]
 pub enum ContractOp<S: ContractStateAccess> {
@@ -267,15 +267,18 @@ impl<S: ContractStateAccess> InstructionSet for ContractOp<S> {
         macro_rules! load_revealed_inputs {
             ($state_type:ident) => {{
                 match context.op_info.prev_state.get($state_type) {
-                    Some(TypedAssigns::Fungible(state)) => {
+                    Some(assignments) => {
                         let mut values = vec![];
-                        for assign in state.iter().map(Assign::as_revealed_state) {
-                            values.push(assign.as_inner().as_u64())
+                        for assign in assignments.iter() {
+                            if let RevealedState::Fungible(assign) = assign {
+                                values.push(assign.as_inner().as_u64())
+                            } else {
+                                fail!()
+                            }
                         }
                         values
                     }
                     None => vec![],
-                    _ => fail!(),
                 }
             }};
         }
@@ -304,7 +307,7 @@ impl<S: ContractStateAccess> InstructionSet for ContractOp<S> {
                         .op_info
                         .prev_state
                         .get(state_type)
-                        .map(|a| a.len_u16())
+                        .map(|a| a.len() as u16)
                         .unwrap_or(0),
                 );
             }
@@ -345,12 +348,12 @@ impl<S: ContractStateAccess> InstructionSet for ContractOp<S> {
                 };
                 let index: u16 = reg_32.into();
 
-                let Some(Ok(state)) = context
-                    .op_info
-                    .prev_state
-                    .get(state_type)
-                    .map(|a| a.as_structured_state_at(index))
-                else {
+                let Some(state) = context.op_info.prev_state.get(state_type).and_then(|a| {
+                    a.get(index as usize).and_then(|s| match s {
+                        RevealedState::Structured(state) => Some(state),
+                        _ => None,
+                    })
+                }) else {
                     fail!()
                 };
                 let state = state.as_inner();

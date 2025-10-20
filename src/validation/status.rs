@@ -27,7 +27,7 @@ use std::fmt::{self, Display, Formatter};
 use aluvm::library::LibId;
 use amplify::num::u24;
 use bp::seals::txout::CloseMethod;
-use bp::Txid;
+use bp::{Outpoint, Txid};
 use commit_verify::mpc::InvalidProof;
 use strict_types::{SemId, Ty};
 
@@ -196,55 +196,29 @@ pub enum Failure {
     SchemaAssignmentOccurrences(OpId, schema::AssignmentType, OccurrencesMismatch),
 
     // Consignment consistency errors
-    /// operation {0} is referenced within the history multiple times. RGB
+    /// opout {0} is referenced within the history multiple times. RGB
     /// contracts allow only direct acyclic graphs.
-    CyclicGraph(OpId),
-    /// operation {0} is absent from the consignment.
-    OperationAbsent(OpId),
-    /// anchor for transitio bundle {0} is absent in the consignment.
-    AnchorAbsent(BundleId),
-    /// witness id for transition bundle {0} is absent in the consignment.
-    WitnessIdAbsent(BundleId),
+    CyclicGraph(Opout),
     /// operation {0} is under a different contract {1}.
     ContractMismatch(OpId, ContractId),
-    /// opout {0} appears more than once as input
-    DoubleSpend(Opout),
-    /// transition bundle {0} known transitions references a state transition which is not
-    /// in the bundle input map.
-    ExtraKnownTransition(BundleId),
     /// transition claims ID {0} which differs from the actual one {1}
     TransitionIdMismatch(OpId, OpId),
-    /// found a transition {0} not in order.
-    UnorderedTransition(OpId),
 
     // Errors checking bundle commitments
-    /// transition bundle {0} references non-existing input in witness {2} for
-    /// the state transition {1}.
-    WitnessMissingInput(BundleId, OpId, Txid),
-    /// transition bundle {0} input map is missing an opout {1} in input on a known transition
-    MissingInputMapTransition(BundleId, OpId),
+    /// transition bundle {0} references non-existing input {1} in witness {2}.
+    WitnessMissingInput(BundleId, Outpoint, Txid),
+    /// transition bundle {0} input map does not include operation {1} as the one
+    /// spending opout {1}.
+    InputMapTransitionMismatch(BundleId, OpId, Opout),
 
     // Errors checking seal closing
-    /// transition {opid} references state type {state_type} absent in the
-    /// outputs of previous state transition {prev_id}.
-    NoPrevState {
-        opid: OpId,
-        prev_id: OpId,
-        state_type: schema::AssignmentType,
-    },
-    /// transition {0} references non-existing previous output {1}.
-    NoPrevOut(OpId, Opout),
-    /// seal defined in the history as a part of operation output {0} is
-    /// confidential and can't be validated.
-    ConfidentialSeal(Opout),
+    /// transition {0} references previous state {1} that cannot be found.
+    NoPrevState(OpId, Opout),
     /// bundle {0} public witness {1} is not known to the resolver.
     SealNoPubWitness(BundleId, Txid),
     /// transition bundle {0} doesn't close seal with the witness {1}. Details:
     /// {2}
     SealsInvalid(BundleId, Txid, String),
-    /// single-use seals for the operation {0} were not validated, which
-    /// probably indicates unanchored state transition.
-    SealsUnvalidated(OpId),
     /// transition bundle {0} is not properly anchored to the witness {1}.
     /// Details: {2}
     MpcInvalid(BundleId, Txid, Box<InvalidProof>),
