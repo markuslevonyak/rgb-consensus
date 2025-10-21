@@ -197,4 +197,21 @@ impl TransitionBundle {
             .expect("same size as input map");
         Ok(true)
     }
+
+    pub fn to_concealed_except(&self, opid: OpId) -> Result<Self, UnrelatedTransition> {
+        Ok(Self {
+            input_map: self.input_map.clone(),
+            known_transitions: Confined::try_from_iter(
+                self.known_transitions
+                    .as_unconfined()
+                    .iter()
+                    .filter(|kt| opid == kt.opid)
+                    .cloned(),
+            )
+            .map_err(|e| match e {
+                amplify::confinement::Error::Undersize { .. } => UnrelatedTransition(opid),
+                _ => unreachable!("same size as input map"),
+            })?,
+        })
+    }
 }
