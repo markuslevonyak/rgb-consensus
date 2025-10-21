@@ -22,7 +22,7 @@
 
 use std::collections::BTreeSet;
 
-use amplify::confinement::{NonEmptyOrdMap, NonEmptyVec, U16 as U16MAX};
+use amplify::confinement::{Confined, NonEmptyOrdMap, NonEmptyVec, U16 as U16MAX};
 use amplify::{Bytes32, Wrapper};
 use bp::Vout;
 use commit_verify::{mpc, CommitEncode, CommitEngine, CommitId, CommitmentId, DigestExt, Sha256};
@@ -177,6 +177,20 @@ impl TransitionBundle {
         }
         if self.known_transitions_contain_opid(&opid) {
             return Ok(false);
+        }
+        if let Some((_, child_opid)) = self.input_map.iter().find(|(opout, _)| opout.op == opid) {
+            if let Some(pos) = self
+                .known_transitions
+                .iter()
+                .position(|kt| kt.opid == *child_opid)
+            {
+                // keep bundle transitions sorted if they are interdependent
+                let mut known_transitions = self.known_transitions.to_unconfined();
+                known_transitions.insert(pos, KnownTransition { opid, transition });
+                // from_checked is safe because known_transitions has same size as input map
+                self.known_transitions = Confined::from_checked(known_transitions);
+                return Ok(true);
+            }
         }
         self.known_transitions
             .push(KnownTransition { opid, transition })
