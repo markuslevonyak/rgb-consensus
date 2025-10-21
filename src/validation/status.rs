@@ -32,6 +32,7 @@ use commit_verify::mpc::InvalidProof;
 use strict_types::{SemId, Ty};
 
 use crate::schema::{self, SchemaId};
+use crate::vm::WitnessOrd;
 use crate::{
     BundleId, ChainNet, ContractId, OccurrencesMismatch, OpFullType, OpId, Opout,
     SealClosingStrategy, StateType,
@@ -59,6 +60,7 @@ pub struct Status {
     pub warnings: Vec<Warning>,
     pub info: Vec<Info>,
     pub input_opouts: BTreeSet<Opout>,
+    pub tx_ord_map: HashMap<Txid, WitnessOrd>,
 }
 
 impl Display for Status {

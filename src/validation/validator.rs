@@ -178,8 +178,6 @@ pub struct Validator<
     contract_state: Rc<RefCell<S>>,
     input_assignments: RefCell<BTreeSet<Opout>>,
 
-    tx_ord_map: RefCell<HashMap<Txid, WitnessOrd>>,
-
     validated_opids: RefCell<BTreeSet<OpId>>,
 
     // Operations in this set will not be validated
@@ -218,8 +216,6 @@ impl<
 
         let input_transitions = RefCell::new(BTreeSet::<Opout>::new());
 
-        let tx_ord_map = RefCell::new(HashMap::<Txid, WitnessOrd>::new());
-
         let validated_opids = RefCell::new(BTreeSet::<OpId>::new());
 
         Self {
@@ -230,7 +226,6 @@ impl<
             chain_net,
             trusted_op_seals,
             input_assignments: input_transitions,
-            tx_ord_map,
             validated_opids,
             resolver: CheckedWitnessResolver::from(resolver),
             contract_state: Rc::new(RefCell::new(S::init(context))),
@@ -324,39 +319,41 @@ impl<
 
         // [VALIDATION]: Iterating over all consignment operations
         let mut unsafe_history_map: HashMap<u32, HashSet<Txid>> = HashMap::new();
-        let tx_ord_map = self.tx_ord_map.borrow();
-        for bundle in self.consignment.bundles() {
-            let bundle_id = bundle.bundle_id();
-            let (witness_id, _) = self
-                .consignment
-                .anchor(bundle_id)
-                .expect("invalid checked consignment");
-            let witness_ord = tx_ord_map
-                .get(&witness_id)
-                .expect("every TX has been already successfully resolved at this point");
-            if let Some(safe_height) = self.safe_height {
-                match witness_ord {
-                    WitnessOrd::Mined(witness_pos) => {
-                        let witness_height = witness_pos.height();
-                        if witness_height > safe_height {
-                            unsafe_history_map
-                                .entry(witness_height.into())
-                                .or_default()
-                                .insert(witness_id);
+        {
+            let tx_ord_map = &self.status.borrow().tx_ord_map;
+            for bundle in self.consignment.bundles() {
+                let bundle_id = bundle.bundle_id();
+                let (witness_id, _) = self
+                    .consignment
+                    .anchor(bundle_id)
+                    .expect("invalid checked consignment");
+                let witness_ord = tx_ord_map
+                    .get(&witness_id)
+                    .expect("every TX has been already successfully resolved at this point");
+                if let Some(safe_height) = self.safe_height {
+                    match witness_ord {
+                        WitnessOrd::Mined(witness_pos) => {
+                            let witness_height = witness_pos.height();
+                            if witness_height > safe_height {
+                                unsafe_history_map
+                                    .entry(witness_height.into())
+                                    .or_default()
+                                    .insert(witness_id);
+                            }
+                        }
+                        WitnessOrd::Tentative | WitnessOrd::Ignored | WitnessOrd::Archived => {
+                            unsafe_history_map.entry(0).or_default().insert(witness_id);
                         }
                     }
-                    WitnessOrd::Tentative | WitnessOrd::Ignored | WitnessOrd::Archived => {
-                        unsafe_history_map.entry(0).or_default().insert(witness_id);
-                    }
                 }
-            }
-            for KnownTransition { transition, .. } in &bundle.known_transitions {
-                self.validate_operation(OrdOpRef::Transition(
-                    transition,
-                    witness_id,
-                    *witness_ord,
-                    bundle_id,
-                ))?;
+                for KnownTransition { transition, .. } in &bundle.known_transitions {
+                    self.validate_operation(OrdOpRef::Transition(
+                        transition,
+                        witness_id,
+                        *witness_ord,
+                        bundle_id,
+                    ))?;
+                }
             }
         }
         if self.safe_height.is_some() && !unsafe_history_map.is_empty() {
@@ -487,7 +484,10 @@ impl<
                 WitnessStatus::Resolved(tx, ord) if ord != WitnessOrd::Archived => {
                     let seals = seals.as_ref();
                     let witness = Witness::with(tx.clone(), anchor.dbc_proof.clone());
-                    self.tx_ord_map.borrow_mut().insert(witness.txid, ord);
+                    self.status
+                        .borrow_mut()
+                        .tx_ord_map
+                        .insert(witness.txid, ord);
                     self.validate_seal_closing(
                         seals,
                         bundle_id,
