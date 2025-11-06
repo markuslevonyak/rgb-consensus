@@ -37,7 +37,7 @@ use super::status::{Failure, Warning};
 use super::{CheckedConsignment, ConsignmentApi, DbcProof, Status};
 use crate::assignments::RevealedAssign;
 use crate::operation::seal::ExposedSeal;
-use crate::validation::Scripts;
+use crate::validation::{OpoutsDagInfo, Scripts};
 use crate::vm::{ContractStateAccess, ContractStateEvolve, OrdOpRef, WitnessOrd};
 use crate::{
     AssignmentType, Assignments, BundleId, ChainNet, ContractId, KnownTransition, OpId, Operation,
@@ -161,6 +161,15 @@ impl<R: ResolveWitness> ResolveWitness for CheckedWitnessResolver<R> {
     }
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct ValidationConfig {
+    pub chain_net: ChainNet,
+    pub safe_height: Option<NonZeroU32>,
+    pub trusted_op_seals: BTreeSet<OpId>,
+    pub trusted_typesystem: TypeSystem,
+    pub build_opouts_dag: bool,
+}
+
 pub struct Validator<
     'consignment,
     'resolver,
@@ -178,6 +187,9 @@ pub struct Validator<
     scripts: Scripts,
 
     contract_state: Rc<RefCell<S>>,
+
+    input_opouts: RefCell<BTreeSet<Opout>>,
+
     opout_assigns: RefCell<BTreeMap<Opout, RevealedAssign>>,
 
     // Operations in this set will not be validated
@@ -185,6 +197,7 @@ pub struct Validator<
     resolver: CheckedWitnessResolver<&'resolver R>,
     safe_height: Option<NonZeroU32>,
     trusted_typesystem: TypeSystem,
+    opouts_dag_info: Option<RefCell<OpoutsDagInfo>>,
 }
 
 impl<
@@ -199,9 +212,7 @@ impl<
         consignment: &'consignment C,
         resolver: &'resolver R,
         context: S::Context<'_>,
-        safe_height: Option<NonZeroU32>,
-        trusted_op_seals: BTreeSet<OpId>,
-        trusted_typesystem: TypeSystem,
+        validation_config: &ValidationConfig,
     ) -> Self {
         // We use validation status object to store all detected failures and
         // warnings
@@ -216,7 +227,14 @@ impl<
         let scripts =
             ConfinedOrdMap::from_iter_checked(consignment.scripts().map(|s| (s.id(), s.clone())));
 
+        let input_opouts = RefCell::new(BTreeSet::<Opout>::new());
+
         let opout_assigns = RefCell::new(BTreeMap::<Opout, RevealedAssign>::new());
+
+        let mut opouts_dag_info = None;
+        if validation_config.build_opouts_dag {
+            opouts_dag_info = Some(RefCell::new(OpoutsDagInfo::new()));
+        }
 
         Self {
             consignment,
@@ -225,12 +243,14 @@ impl<
             contract_id,
             chain_net,
             scripts,
-            trusted_op_seals,
+            trusted_op_seals: validation_config.trusted_op_seals.clone(),
+            input_opouts,
             opout_assigns,
             resolver: CheckedWitnessResolver::from(resolver),
             contract_state: Rc::new(RefCell::new(S::init(context))),
-            safe_height,
-            trusted_typesystem,
+            safe_height: validation_config.safe_height,
+            trusted_typesystem: validation_config.trusted_typesystem.clone(),
+            opouts_dag_info,
         }
     }
 
@@ -241,28 +261,18 @@ impl<
     pub fn validate(
         consignment: &'consignment C,
         resolver: &'resolver R,
-        chain_net: ChainNet,
         context: S::Context<'_>,
-        safe_height: Option<NonZeroU32>,
-        trusted_op_seals: BTreeSet<OpId>,
-        trusted_typesystem: TypeSystem,
+        validation_config: &ValidationConfig,
     ) -> Result<Status, ValidationError> {
-        let mut validator = Self::init(
-            consignment,
-            resolver,
-            context,
-            safe_height,
-            trusted_op_seals,
-            trusted_typesystem,
-        );
+        let mut validator = Self::init(consignment, resolver, context, validation_config);
         // If the chain-network pair doesn't match there is no point in validating the contract
         // since all witness transactions will be missed.
-        if validator.chain_net != chain_net {
+        if validator.chain_net != validation_config.chain_net {
             return Err(ValidationError::InvalidConsignment(Failure::ContractChainNetMismatch(
-                chain_net,
+                validation_config.chain_net,
             )));
         }
-        if let Err(e) = resolver.check_chain_net(chain_net) {
+        if let Err(e) = resolver.check_chain_net(validation_config.chain_net) {
             return Err(ValidationError::ResolverError(e));
         }
 
@@ -326,9 +336,13 @@ impl<
         witness_id: Option<Txid>,
         assignments: &Assignments<impl ExposedSeal>,
     ) -> Result<(), ValidationError> {
+        let mut output_nodes = Vec::new();
         for (ty, ass) in assignments.iter() {
             for no in 0..ass.len_u16() {
                 let opout = Opout::new(opid, *ty, no);
+                if let Some(dag_info) = &self.opouts_dag_info {
+                    output_nodes.push(dag_info.borrow_mut().register_output(opout));
+                }
                 let Ok(revealed_assign) = ass.to_revealed_assign_at(no, witness_id) else {
                     continue;
                 };
@@ -336,6 +350,9 @@ impl<
                     .borrow_mut()
                     .insert(opout, revealed_assign);
             }
+        }
+        if let Some(dag_info) = &self.opouts_dag_info {
+            dag_info.borrow_mut().cache_outputs(&opid, output_nodes);
         }
         Ok(())
     }
@@ -372,12 +389,18 @@ impl<
                 )?;
                 let KnownTransition { opid, transition } = known_transition;
                 self.process_assignments(*opid, Some(witness_id), &transition.assignments)?;
+                if let Some(ref mut dag_info) = self.opouts_dag_info {
+                    dag_info.borrow_mut().connect_transition(transition, opid);
+                }
             }
         }
         if self.safe_height.is_some() && !unsafe_history_map.is_empty() {
             self.status
                 .borrow_mut()
                 .add_warning(Warning::UnsafeHistory(unsafe_history_map));
+        }
+        if let Some(dag_info) = &self.opouts_dag_info {
+            self.status.borrow_mut().dag_data_opt = Some(dag_info.borrow().to_opouts_dag_data());
         }
         Ok(())
     }
@@ -519,7 +542,7 @@ impl<
                 .ok_or(ValidationError::InvalidConsignment(Failure::NoPrevState(opid, input)))?;
             seals.push(seal);
             state_by_type.entry(input.ty).or_default().push(state);
-            if !self.status.borrow_mut().input_opouts.insert(input) {
+            if !self.input_opouts.borrow_mut().insert(input) {
                 return Err(ValidationError::InvalidConsignment(Failure::CyclicGraph(input)));
             };
         }

@@ -21,7 +21,7 @@
 // limitations under the License.
 
 use core::ops::AddAssign;
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Display, Formatter};
 
 use aluvm::library::LibId;
@@ -32,6 +32,7 @@ use commit_verify::mpc::InvalidProof;
 use strict_types::{SemId, Ty};
 
 use crate::schema::{self, SchemaId};
+use crate::validation::OpoutsDagData;
 use crate::vm::WitnessOrd;
 use crate::{
     BundleId, ChainNet, ContractId, OccurrencesMismatch, OpFullType, OpId, Opout,
@@ -50,7 +51,7 @@ pub enum Validity {
     Warnings,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
@@ -59,8 +60,8 @@ pub enum Validity {
 pub struct Status {
     pub warnings: Vec<Warning>,
     pub info: Vec<Info>,
-    pub input_opouts: BTreeSet<Opout>,
     pub tx_ord_map: HashMap<Txid, WitnessOrd>,
+    pub dag_data_opt: Option<OpoutsDagData>,
 }
 
 impl Display for Status {
