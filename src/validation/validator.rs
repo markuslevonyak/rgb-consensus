@@ -529,7 +529,7 @@ impl<
         let mut state_by_type = BTreeMap::<AssignmentType, Vec<RevealedState>>::new();
         let mut seals = BTreeSet::<BlindSeal<Txid>>::new();
         for input in &transition.inputs {
-            if !bundle.input_map.get(&input).is_some_and(|v| *v == opid) {
+            if bundle.input_map.get(&input).is_none_or(|v| *v != opid) {
                 return Err(ValidationError::InvalidConsignment(
                     Failure::InputMapTransitionMismatch(bundle.bundle_id(), opid, input),
                 ));
