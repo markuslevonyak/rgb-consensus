@@ -163,7 +163,6 @@ impl<R: ResolveWitness> ResolveWitness for CheckedWitnessResolver<R> {
 pub struct ValidationConfig {
     pub chain_net: ChainNet,
     pub safe_height: Option<NonZeroU32>,
-    pub trusted_op_seals: BTreeSet<OpId>,
     pub trusted_typesystem: TypeSystem,
     pub build_opouts_dag: bool,
 }
@@ -191,7 +190,6 @@ pub struct Validator<
     opout_assigns: RefCell<BTreeMap<Opout, RevealedAssign>>,
 
     // Operations in this set will not be validated
-    trusted_op_seals: BTreeSet<OpId>,
     resolver: CheckedWitnessResolver<&'resolver R>,
     safe_height: Option<NonZeroU32>,
     trusted_typesystem: TypeSystem,
@@ -241,7 +239,6 @@ impl<
             contract_id,
             chain_net,
             scripts,
-            trusted_op_seals: validation_config.trusted_op_seals.clone(),
             input_opouts,
             opout_assigns,
             resolver: CheckedWitnessResolver::from(resolver),
@@ -515,9 +512,6 @@ impl<
                 opid,
                 transition.id(),
             )));
-        }
-        if self.trusted_op_seals.contains(&opid) {
-            return Ok(());
         }
         if transition.contract_id() != self.contract_id {
             return Err(ValidationError::InvalidConsignment(Failure::ContractMismatch(
