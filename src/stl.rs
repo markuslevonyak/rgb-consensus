@@ -32,8 +32,8 @@ use crate::txout::{self, TxPtr};
 use crate::validation::DbcProof;
 use crate::vm::GlobalOrd;
 use crate::{
-    seals, BundleId, Genesis, OpCommitment, Schema, TransitionBundle, LIB_NAME_RGB_COMMIT,
-    LIB_NAME_RGB_LOGIC,
+    seals, BundleId, ContractId, Genesis, OpCommitment, Schema, TransitionBundle,
+    LIB_NAME_RGB_COMMIT, LIB_NAME_RGB_LOGIC,
 };
 
 pub const LIB_ID_COMMIT_VERIFY: &str =
@@ -102,6 +102,14 @@ pub fn rgb_commit_stl() -> TypeLib {
     .transpile::<Txid>()
     .compile()
     .unwrap()
+}
+
+/// Generates minimal library containing contract ID
+pub fn rgb_contract_id_stl() -> TypeLib {
+    LibBuilder::with(libname!(LIB_NAME_RGB_COMMIT), [])
+        .transpile::<ContractId>()
+        .compile()
+        .unwrap()
 }
 
 /// Generates strict type library providing data types for RGB consensus.
