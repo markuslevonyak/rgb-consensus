@@ -31,6 +31,7 @@ use amplify::num::u256;
 use amplify::{hex, ByteArray, Bytes32, FromSliceError, Wrapper};
 use baid64::{Baid64ParseError, DisplayBaid64, FromBaid64Str};
 use strict_encoding::StrictDumb;
+use strict_types::{StrictDeserialize, StrictSerialize, StrictVal};
 
 use crate::commit_verify::{
     mpc, CommitEncode, CommitEngine, CommitId, CommitmentId, Conceal, DigestExt, MerkleHash,
@@ -54,6 +55,9 @@ pub struct ContractId(
     Bytes32,
 );
 
+impl StrictSerialize for ContractId {}
+impl StrictDeserialize for ContractId {}
+
 impl PartialEq<OpId> for ContractId {
     fn eq(&self, other: &OpId) -> bool { self.to_byte_array() == other.to_byte_array() }
 }
@@ -64,6 +68,10 @@ impl PartialEq<ContractId> for OpId {
 impl ContractId {
     pub fn copy_from_slice(slice: impl AsRef<[u8]>) -> Result<Self, FromSliceError> {
         Bytes32::copy_from_slice(slice).map(Self)
+    }
+
+    pub fn from_strict_val_unchecked(value: StrictVal) -> Self {
+        Self::copy_from_slice(value.unwrap_bytes()).expect("wrong type for StrictVal in input")
     }
 }
 
