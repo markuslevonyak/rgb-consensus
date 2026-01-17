@@ -645,7 +645,7 @@ dependencies = [
 [[package]]
 name = "rgb-aluvm"
 version = "0.11.1-rc.1"
-source = "git+http://github.com/rgb-protocol/rgb-aluvm?branch=master#f4ba3d285265cad927eacdb9306124400583de64"
+source = "git+https://github.com/rgb-protocol/rgb-aluvm?branch=master#1b494fd9dd4d90b2b02cf9f2f357a05053063ee6"
 dependencies = [
  "amplify",
  "baid64",
@@ -665,7 +665,7 @@ dependencies = [
 [[package]]
 name = "rgb-ascii-armor"
 version = "1.0.0"
-source = "git+http://github.com/rgb-protocol/rgb-ascii-armor?branch=master#90c78b0680f3e63ced4678fcd6e15bdda85bb469"
+source = "git+https://github.com/rgb-protocol/rgb-ascii-armor?branch=master#777419a19f1866afe2a0175ce1766b9b25d3fd6f"
 dependencies = [
  "amplify",
  "baid64",
@@ -704,7 +704,7 @@ dependencies = [
 [[package]]
 name = "rgb-strict-encoding"
 version = "1.0.0"
-source = "git+http://github.com/rgb-protocol/rgb-strict-encoding?branch=master#0660b5deb269546d749a450005ea9b3ca8c01794"
+source = "git+https://github.com/rgb-protocol/rgb-strict-encoding?branch=master#062dccfb88196ba2a100e76fef6f3e5adc228a9c"
 dependencies = [
  "amplify",
  "bitcoin",
@@ -716,7 +716,7 @@ dependencies = [
 [[package]]
 name = "rgb-strict-encoding-derive"
 version = "1.0.0"
-source = "git+http://github.com/rgb-protocol/rgb-strict-encoding?branch=master#0660b5deb269546d749a450005ea9b3ca8c01794"
+source = "git+https://github.com/rgb-protocol/rgb-strict-encoding?branch=master#062dccfb88196ba2a100e76fef6f3e5adc228a9c"
 dependencies = [
  "amplify_syn",
  "heck",
@@ -728,7 +728,7 @@ dependencies = [
 [[package]]
 name = "rgb-strict-types"
 version = "1.0.0"
-source = "git+http://github.com/rgb-protocol/rgb-strict-types?branch=master#70b3c22698116ff6929db68ad4afd65e6c2f4b26"
+source = "git+https://github.com/rgb-protocol/rgb-strict-types?branch=master#be9fe385ae79f317b8e06414269e0f67e8d9ae6a"
 dependencies = [
  "amplify",
  "baid64",

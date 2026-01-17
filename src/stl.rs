@@ -22,7 +22,7 @@
 
 pub use aluvm::stl::aluvm_stl;
 use bitcoin::Txid;
-use strict_types::stl::{bitcoin_stl, bitcoin_tx_stl, std_stl, strict_types_stl};
+use strict_types::stl::{bitcoin_stl, std_stl, strict_types_stl};
 use strict_types::typelib::LibBuilder;
 use strict_types::TypeLib;
 
@@ -41,13 +41,13 @@ pub const LIB_ID_COMMIT_VERIFY: &str =
 /// Strict types id for the library providing data types from [`dbc`] and
 /// [`seals`] crates.
 pub const LIB_ID_BPCORE: &str =
-    "stl:o_y9NPCe-nv_Oiad-q5U7Yru-ZLYFBP6-crZnI5h-MShzq9g#comet-betty-native";
+    "stl:tFjXtx2y-aVOTVcD-lfw3f4W-9RLWJmn-o8_nFyL-7WpZRVo#single-college-raja";
 /// Strict types id for the library providing data types for RGB consensus.
 pub const LIB_ID_RGB_COMMIT: &str =
-    "stl:ZqLZTQlK-QVBWlH3-Kg8iJ8I-7DgboM3-hVgUK88-sFcEeVk#leonid-cantina-film";
+    "stl:2CKxVms~-MKFA1Er-2nOHq3q-M_5GP8o-S_z4HIe-0jqI6_Q#peace-lunch-janet";
 /// Strict types id for the library providing data types for RGB consensus.
 pub const LIB_ID_RGB_LOGIC: &str =
-    "stl:1_oMvyia-IfKb5Cq-T3fvBnY-UBYjgcZ-hTrAUGm-t~fFN5A#joker-boston-olga";
+    "stl:2Z_2RMLg-~pxm3ig-_obnAGJ-5A0skqq-qMyKQjL-_MNCLU0#alamo-habitat-alpine";
 
 pub fn commit_verify_stl() -> TypeLib {
     LibBuilder::with(libname!(LIB_NAME_COMMIT_VERIFY), [
@@ -90,7 +90,7 @@ pub fn rgb_commit_stl() -> TypeLib {
         std_stl().to_dependency_types(),
         strict_types_stl().to_dependency_types(),
         commit_verify_stl().to_dependency_types(),
-        bitcoin_tx_stl().to_dependency_types(),
+        bitcoin_stl().to_dependency_types(),
         bp_core_stl().to_dependency_types(),
         aluvm_stl().to_dependency_types(),
     ])
