@@ -362,6 +362,23 @@ impl<Seal: ExposedSeal> TypedAssigns<Seal> {
         })
     }
 
+    pub fn confidential_seal_at(&self, index: u16) -> Result<SecretSeal, UnknownDataError> {
+        Ok(match self {
+            TypedAssigns::Declarative(vec) => vec
+                .get(index as usize)
+                .ok_or(UnknownDataError)?
+                .to_confidential_seal(),
+            TypedAssigns::Fungible(vec) => vec
+                .get(index as usize)
+                .ok_or(UnknownDataError)?
+                .to_confidential_seal(),
+            TypedAssigns::Structured(vec) => vec
+                .get(index as usize)
+                .ok_or(UnknownDataError)?
+                .to_confidential_seal(),
+        })
+    }
+
     pub fn reveal_seal(&mut self, seal: Seal) {
         fn reveal<State: ExposedState, Seal: ExposedSeal>(
             vec: &mut NonEmptyVec<Assign<State, Seal>, U16>,
