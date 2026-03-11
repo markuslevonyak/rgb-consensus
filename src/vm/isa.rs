@@ -72,8 +72,7 @@ impl<S: ContractStateAccess> InstructionSet for RgbIsa<S> {
         match self {
             RgbIsa::Contract(op) => op.exec(regs, site, context),
             RgbIsa::Fail(_) => {
-                isa::ControlFlowOp::Fail.exec(regs, site, &());
-                ExecStep::Stop
+                isa::ControlFlowOp::Fail.exec(regs, site, &())
             }
         }
     }
