@@ -68,7 +68,7 @@ mod spk;
 mod xonlypk;
 
 use bitcoin::key::{Secp256k1, UntweakedPublicKey};
-use bitcoin::taproot::{LeafScript, LeafVersion};
+use bitcoin::taproot::LeafScript;
 use bitcoin::{ScriptBuf, TapNodeHash, Transaction as Tx};
 use strict_types::{StrictDeserialize, StrictSerialize};
 pub use tapscript::{TapretCommitment, TAPRET_SCRIPT_COMMITMENT_PREFIX};
@@ -302,7 +302,8 @@ mod leaf_script_serde {
             LeafVersionSerde::TapScript => TAPROOT_LEAF_TAPSCRIPT,
             LeafVersionSerde::Future(b) => b,
         };
-        let version = LeafVersion::from_consensus(byte).map_err(serde_crate::de::Error::custom)?;
+        let version = bitcoin::taproot::LeafVersion::from_consensus(byte)
+            .map_err(serde_crate::de::Error::custom)?;
         let script_bytes = Vec::<u8>::from_hex(&data.script)
             .map_err(|e| serde_crate::de::Error::custom(format!("invalid hex in script: {}", e)))?;
         let script = ScriptBuf::from_bytes(script_bytes);
