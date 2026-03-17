@@ -45,12 +45,14 @@ pub mod vm;
 pub mod stl;
 
 pub mod prelude {
+    pub use ::bitcoin;
+    pub use ::daggy;
+    pub use ::secp256k1;
     pub use bitcoin::Txid;
     pub use dbc::*;
     pub use operation::*;
     pub use schema::*;
     pub use seals::*;
-    pub use {bitcoin, daggy, secp256k1};
 
     use super::*;
     pub use super::{schema, validation, vm};
