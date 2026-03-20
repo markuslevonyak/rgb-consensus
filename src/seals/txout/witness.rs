@@ -22,11 +22,11 @@
 use std::marker::PhantomData;
 
 use bitcoin::{Transaction as Tx, Txid};
-use single_use_seals::SealWitness;
 
 use super::{TxoSeal, VerifyError};
 use crate::commit_verify::mpc;
 use crate::dbc;
+use crate::single_use_seals::SealWitness;
 
 /// Witness of a bitcoin-based seal being closed. Includes both transaction and
 /// extra-transaction data.

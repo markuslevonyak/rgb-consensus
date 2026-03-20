@@ -27,7 +27,6 @@ use std::rc::Rc;
 
 use amplify::confinement::{Collection, ConfinedOrdMap};
 use bitcoin::{Transaction as Tx, Txid};
-use single_use_seals::SealWitness;
 use strict_types::TypeSystem;
 
 use super::status::{Failure, Warning};
@@ -37,6 +36,7 @@ use crate::commit_verify::mpc;
 use crate::dbc::{self, Anchor};
 use crate::operation::seal::ExposedSeal;
 use crate::seals::txout::{CloseMethod, Witness};
+use crate::single_use_seals::SealWitness;
 use crate::txout::BlindSeal;
 use crate::validation::{OpoutsDagInfo, Scripts};
 use crate::vm::{ContractStateAccess, ContractStateEvolve, OrdOpRef, WitnessOrd};

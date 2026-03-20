@@ -38,6 +38,7 @@ pub mod dbc;
 mod operation;
 pub mod schema;
 pub mod seals;
+mod single_use_seals;
 pub mod validation;
 #[macro_use]
 pub mod vm;
