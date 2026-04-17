@@ -795,7 +795,7 @@ mod test {
                 .map(|pid| mpc_block.to_merkle_proof(*pid).unwrap())
                 .collect::<Vec<_>>();
 
-            let mut iter = proofs.iter().zip(msgs.into_iter());
+            let mut iter = proofs.iter().zip(msgs);
             let (proof, (pid, msg)) = iter.next().unwrap();
             let mut merged_block = MerkleBlock::with(proof, pid, msg).unwrap();
             for (proof, (pid, msg)) in iter {
