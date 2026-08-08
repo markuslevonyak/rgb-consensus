@@ -296,6 +296,7 @@ impl<T: CommitEncode> CommitId for T {
     serde(crate = "serde_crate", transparent)
 )]
 pub struct StrictHash(
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::byte_array"))]
     #[from]
     #[from([u8; 32])]
     Bytes32,

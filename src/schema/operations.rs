@@ -106,8 +106,11 @@ pub trait OpSchema {
     serde(crate = "serde_crate", rename_all = "camelCase")
 )]
 pub struct GenesisSchema {
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::confined"))]
     pub metadata: MetaSchema,
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::confined"))]
     pub globals: GlobalSchema,
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::confined"))]
     pub assignments: AssignmentsSchema,
     // NB: it is possible to transform option into enum covering other virtual machines
     pub validator: Option<LibSite>,
@@ -124,9 +127,13 @@ impl DefaultBasedStrictDumb for GenesisSchema {}
     serde(crate = "serde_crate", rename_all = "camelCase")
 )]
 pub struct TransitionSchema {
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::confined"))]
     pub metadata: MetaSchema,
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::confined"))]
     pub globals: GlobalSchema,
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::confined"))]
     pub inputs: InputsSchema,
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::confined"))]
     pub assignments: AssignmentsSchema,
     pub validator: Option<LibSite>,
 }

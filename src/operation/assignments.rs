@@ -52,7 +52,10 @@ use crate::{
         bound = "A: serde::Serialize + serde::de::DeserializeOwned"
     )
 )]
-pub struct AssignVec<A>(NonEmptyVec<A, U16>)
+pub struct AssignVec<A>(
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::confined"))]
+    NonEmptyVec<A, U16>,
+)
 where A: StrictDumb + StrictEncode + StrictDecode;
 
 impl<A: StrictDumb + StrictEncode + StrictDecode> AssignVec<A> {
@@ -531,7 +534,10 @@ impl TypedAssigns<GenesisSeal> {
         bound = "Seal: serde::Serialize + serde::de::DeserializeOwned"
     )
 )]
-pub struct Assignments<Seal>(SmallOrdMap<AssignmentType, TypedAssigns<Seal>>)
+pub struct Assignments<Seal>(
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::confined"))]
+    SmallOrdMap<AssignmentType, TypedAssigns<Seal>>,
+)
 where Seal: ExposedSeal;
 
 impl<Seal: ExposedSeal> DefaultBasedStrictDumb for Assignments<Seal> {}

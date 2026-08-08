@@ -159,7 +159,10 @@ mod serde_utils {
     derive(Serialize, Deserialize),
     serde(crate = "serde_crate", transparent)
 )]
-pub struct Inputs(NonEmptyOrdSet<Opout, U16>);
+pub struct Inputs(
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::confined"))]
+    NonEmptyOrdSet<Opout, U16>,
+);
 
 impl<'a> IntoIterator for &'a Inputs {
     type Item = Opout;
@@ -341,7 +344,10 @@ impl StrictDeserialize for Genesis {}
     derive(Serialize, Deserialize),
     serde(crate = "serde_crate", rename_all = "camelCase")
 )]
-pub struct Signature(Bytes64);
+pub struct Signature(
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::byte_array"))]
+    Bytes64,
+);
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]

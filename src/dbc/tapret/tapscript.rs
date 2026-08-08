@@ -116,7 +116,7 @@ impl TapretCommitment {
 
 #[cfg(feature = "serde")]
 mod _serde {
-    use amplify::{Bytes, Wrapper};
+    use amplify::Wrapper;
     use serde_crate::de::Error;
     use serde_crate::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -140,7 +140,9 @@ mod _serde {
                 let s = String::deserialize(deserializer)?;
                 Self::from_str(&s).map_err(D::Error::custom)
             } else {
-                let slice = Bytes::<33>::deserialize(deserializer)?;
+                let slice = strict_encoding::serde_helpers::byte_array::deserialize::<D, 33, false>(
+                    deserializer,
+                )?;
                 Ok(Self::from(slice.into_inner()))
             }
         }

@@ -87,6 +87,7 @@ pub enum MergeError {
 enum TreeNode {
     /// A node of the tree with concealed leaf or tree branch information.
     ConcealedNode {
+        #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::small_int"))]
         /// Depth of the node.
         depth: u5,
         /// Node hash.
@@ -140,6 +141,7 @@ impl TreeNode {
     serde(crate = "serde_crate", rename_all = "camelCase")
 )]
 pub struct MerkleConcealed {
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::small_int"))]
     /// Tree depth (up to 16).
     depth: u5,
 
@@ -169,6 +171,7 @@ impl Conceal for MerkleConcealed {
 #[strict_type(lib = LIB_NAME_COMMIT_VERIFY)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(crate = "serde_crate"))]
 pub struct MerkleBlock {
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::small_int"))]
     /// Tree depth (up to 16).
     #[getter(as_copy)]
     depth: u5,
@@ -178,6 +181,7 @@ pub struct MerkleBlock {
     #[getter(as_copy)]
     cofactor: u16,
 
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::confined"))]
     /// Tree cross-section.
     #[getter(skip)]
     cross_section: NonEmptyVec<TreeNode, U32MAX>,
@@ -671,6 +675,7 @@ pub struct MerkleProof {
     #[getter(as_copy)]
     cofactor: u16,
 
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::confined"))]
     /// Merkle proof path consisting of node hashing partners.
     #[getter(skip)]
     path: Confined<Vec<MerkleHash>, 0, 31>,

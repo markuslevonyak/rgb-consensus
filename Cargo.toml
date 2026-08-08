@@ -58,7 +58,6 @@ stl = [
 ]
 serde = [
     "rgb-aluvm/serde",
-    "amplify/serde",
     "secp256k1/serde",
     "serde_crate",
     "rgb-strict-encoding/serde",
@@ -89,3 +88,8 @@ wasm-bindgen-test = "0.3"
 
 [package.metadata.docs.rs]
 features = ["all"]
+
+[patch.crates-io]
+rgb-strict-encoding = { git = "https://github.com/rgb-protocol/rgb-strict-encoding", rev = "7feb0f2" }
+rgb-strict-types = { git = "https://github.com/rgb-protocol/rgb-strict-types", rev = "8dfd921" }
+rgb-aluvm = { git = "https://github.com/rgb-protocol/rgb-aluvm", rev = "536fb55" }

@@ -180,7 +180,13 @@ pub enum Failure {
     SchemaGlobalStateOccurrences(OpId, schema::GlobalStateType, OccurrencesMismatch),
     /// number of global state entries of type {1} in operation {0} exceeds
     /// schema-defined maximum for that global state type ({2} vs {3}).
-    SchemaGlobalStateLimit(OpId, schema::GlobalStateType, u16, u24),
+    SchemaGlobalStateLimit(
+        OpId,
+        schema::GlobalStateType,
+        u16,
+        #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::small_int"))]
+        u24,
+    ),
     /// required metadata type {1} is not present in the operation {0}.
     SchemaNoMetadata(OpId, schema::MetaType),
     /// invalid metadata in operation {0} not matching semantic type id {1}.

@@ -80,6 +80,7 @@ pub type Vin = Vout;
     serde(crate = "serde_crate", transparent)
 )]
 pub struct BundleId(
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::byte_array"))]
     #[from]
     #[from([u8; 32])]
     Bytes32,
@@ -135,7 +136,9 @@ impl KnownTransition {
     serde(crate = "serde_crate", rename_all = "camelCase")
 )]
 pub struct TransitionBundle {
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::confined"))]
     pub input_map: NonEmptyOrdMap<Opout, OpId, U16MAX>,
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::confined"))]
     pub known_transitions: NonEmptyVec<KnownTransition, U16MAX>,
 }
 

@@ -115,6 +115,7 @@ impl_serde_baid64!(ContractId);
     serde(crate = "serde_crate", transparent)
 )]
 pub struct OpId(
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::byte_array"))]
     #[from]
     #[from([u8; 32])]
     Bytes32,
@@ -152,6 +153,7 @@ impl OpId {
     serde(crate = "serde_crate", transparent)
 )]
 pub struct DiscloseHash(
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::byte_array"))]
     #[from]
     #[from([u8; 32])]
     Bytes32,

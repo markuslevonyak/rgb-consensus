@@ -86,6 +86,7 @@ impl DefaultBasedStrictDumb for FungibleType {}
 )]
 pub struct GlobalStateSchema {
     pub sem_id: SemId,
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::small_int"))]
     pub max_items: u24,
 }
 

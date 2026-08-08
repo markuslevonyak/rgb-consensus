@@ -192,10 +192,14 @@ pub struct Schema {
 
     pub name: TypeName,
 
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::confined"))]
     pub meta_types: TinyOrdMap<MetaType, MetaDetails>,
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::confined"))]
     pub global_types: TinyOrdMap<GlobalStateType, GlobalDetails>,
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::confined"))]
     pub owned_types: TinyOrdMap<AssignmentType, AssignmentDetails>,
     pub genesis: GenesisSchema,
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::confined"))]
     pub transitions: TinyOrdMap<TransitionType, TransitionDetails>,
 
     pub default_assignment: Option<AssignmentType>,

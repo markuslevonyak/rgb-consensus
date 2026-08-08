@@ -49,6 +49,7 @@ pub type MessageMap = MediumOrdMap<ProtocolId, Message>;
     serde(crate = "serde_crate", transparent)
 )]
 pub struct ProtocolId(
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::byte_array"))]
     #[from]
     #[from([u8; 32])]
     Bytes32,
@@ -74,6 +75,7 @@ impl ProtocolId {
     serde(crate = "serde_crate", transparent)
 )]
 pub struct Message(
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::byte_array"))]
     #[from]
     #[from([u8; 32])]
     Bytes32,
@@ -135,6 +137,7 @@ impl StrictDumb for Leaf {
     serde(crate = "serde_crate", transparent)
 )]
 pub struct Commitment(
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::byte_array"))]
     #[from]
     #[from([u8; 32])]
     Bytes32,

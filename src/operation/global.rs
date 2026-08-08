@@ -39,7 +39,10 @@ use crate::{schema, RevealedData, LIB_NAME_RGB_COMMIT};
     derive(Serialize, Deserialize),
     serde(crate = "serde_crate", transparent)
 )]
-pub struct GlobalValues(Confined<Vec<RevealedData>, 1, U16>);
+pub struct GlobalValues(
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::confined"))]
+    Confined<Vec<RevealedData>, 1, U16>,
+);
 
 impl StrictDumb for GlobalValues {
     fn strict_dumb() -> Self { Self(Confined::with(RevealedData::strict_dumb())) }
@@ -66,7 +69,10 @@ impl IntoIterator for GlobalValues {
     derive(Serialize, Deserialize),
     serde(crate = "serde_crate", transparent)
 )]
-pub struct GlobalState(TinyOrdMap<schema::GlobalStateType, GlobalValues>);
+pub struct GlobalState(
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::confined"))]
+    TinyOrdMap<schema::GlobalStateType, GlobalValues>,
+);
 
 impl DefaultBasedStrictDumb for GlobalState {}
 

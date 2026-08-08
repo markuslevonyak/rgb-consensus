@@ -86,7 +86,10 @@ mod _serde {
     derive(Serialize, Deserialize),
     serde(crate = "serde_crate", transparent)
 )]
-pub struct Metadata(TinyOrdMap<schema::MetaType, MetaValue>);
+pub struct Metadata(
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::confined"))]
+    TinyOrdMap<schema::MetaType, MetaValue>,
+);
 
 impl CommitEncode for Metadata {
     type CommitmentId = StrictHash;
