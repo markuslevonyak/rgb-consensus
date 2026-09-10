@@ -37,6 +37,10 @@ daggy = { version = "0.9.0", features = [
 hex-conservative = "1.2.0"
 rand = "0.9.1"
 ripemd = "0.2.0"
+secp256k1 = { version = "0.33.1", features = [
+    "global-context",
+    "rand",
+] }
 serde_crate = { package = "serde", version = "1", features = [
     "derive",
 ], optional = true }
@@ -64,17 +68,7 @@ serde = [
     "rgb-strict-types/serde",
 ]
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-secp256k1 = { version = "0.31.1", features = [
-    "global-context",
-    "rand",
-] }
-
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-secp256k1 = { version = "0.32.0-beta.2", features = [
-    "global-context",
-    "rand",
-] }
 wasm-bindgen = "0.2"
 getrandom2 = { version = "0.2", package = "getrandom", features = [
     "js",
@@ -92,4 +86,4 @@ features = ["all"]
 [patch.crates-io]
 rgb-strict-encoding = { git = "https://github.com/rgb-protocol/rgb-strict-encoding", rev = "7feb0f2" }
 rgb-strict-types = { git = "https://github.com/rgb-protocol/rgb-strict-types", rev = "8dfd921" }
-rgb-aluvm = { git = "https://github.com/rgb-protocol/rgb-aluvm", rev = "536fb55" }
+rgb-aluvm = { git = "https://github.com/rgb-protocol/rgb-aluvm", rev = "ea0705a" }
