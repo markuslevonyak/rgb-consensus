@@ -7,7 +7,6 @@ repository = "https://github.com/rgb-protocol/rgb-consensus"
 homepage = "https://rgb.info"
 keywords = ["bitcoin", "lightning", "rgb", "smart-contracts", "lnp-bp"]
 categories = ["cryptography::cryptocurrencies"]
-readme = "README.md"
 license = "Apache-2.0"
 edition = "2021"
 rust-version = "1.85.0"
