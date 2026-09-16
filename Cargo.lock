@@ -761,8 +761,9 @@ dependencies = [
 
 [[package]]
 name = "rgb-aluvm"
-version = "0.11.1-rc.4"
-source = "git+https://github.com/rgb-protocol/rgb-aluvm?rev=ea0705a#ea0705ac83dc7394ff64367916fd9c3391c70332"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b371aad57bb172879ef661d1cc102dadca47ff703def8d916b31ca772180960"
 dependencies = [
  "amplify",
  "baid64",
@@ -779,9 +780,9 @@ dependencies = [
 
 [[package]]
 name = "rgb-ascii-armor"
-version = "1.0.2"
+version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fcde5a129540e5911c24930fd854ea658a715b50a690d254273088f907a63516"
+checksum = "559bf258d790594c2e6e6c31ec40d0f70e0511cd05ab1dca99d40207f2bbf1f7"
 dependencies = [
  "amplify",
  "baid64",
@@ -792,7 +793,7 @@ dependencies = [
 
 [[package]]
 name = "rgb-consensus"
-version = "0.11.1-rc.11"
+version = "0.11.1"
 dependencies = [
  "amplify",
  "baid64",
@@ -817,8 +818,9 @@ dependencies = [
 
 [[package]]
 name = "rgb-strict-encoding"
-version = "1.0.2"
-source = "git+https://github.com/rgb-protocol/rgb-strict-encoding?rev=7feb0f2#7feb0f2986a49cf3fa084e7030c8aa162356779d"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "784229a9cf3ed198e59cbd44bc5a3c772619e5f2a864eea3ec13524ec4eb1616"
 dependencies = [
  "amplify",
  "bitcoin",
@@ -829,8 +831,9 @@ dependencies = [
 
 [[package]]
 name = "rgb-strict-encoding-derive"
-version = "1.0.2"
-source = "git+https://github.com/rgb-protocol/rgb-strict-encoding?rev=7feb0f2#7feb0f2986a49cf3fa084e7030c8aa162356779d"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c934f3ba39e537f231bc4b2da936e333e2a96be01a595dd99a63dfe6399a7b5d"
 dependencies = [
  "amplify_syn",
  "heck",
@@ -841,8 +844,9 @@ dependencies = [
 
 [[package]]
 name = "rgb-strict-types"
-version = "1.0.2"
-source = "git+https://github.com/rgb-protocol/rgb-strict-types?rev=8dfd921#8dfd9210f7c9d454409ac44f93cd72b7cd8c0a10"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7cb1f717f2235eedfb147cfd5a47ccdb6660168e38f1acf2afcb199d19104e2f"
 dependencies = [
  "amplify",
  "baid64",
