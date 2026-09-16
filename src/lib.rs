@@ -21,7 +21,7 @@
 // limitations under the License.
 
 #![allow(unused_braces)] // Rust compiler can't properly parse derivation macros
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 #[macro_use]
 extern crate amplify;
